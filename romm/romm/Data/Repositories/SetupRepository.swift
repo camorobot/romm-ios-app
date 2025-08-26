@@ -1,0 +1,338 @@
+//
+//  SetupRepository.swift
+//  romm
+//
+//  Created by Ilyas Hallak on 07.08.25.
+//
+
+import Foundation
+import Security
+
+// MARK: - Setup Data Models
+struct SetupConfiguration: Codable {
+    let serverURL: String
+    let username: String
+    let password: String?
+    let token: String?
+    let refreshToken: String?
+    let setupDate: Date
+    let version: String
+}
+
+// MARK: - Setup Repository Protocol
+protocol SetupRepositoryProtocol {
+    func saveSetupConfiguration(_ config: SetupConfiguration) throws
+    func getSetupConfiguration() -> SetupConfiguration?
+    func isSetupComplete() -> Bool
+    func clearSetupConfiguration() throws
+    func updateToken(_ token: String) throws
+    func saveAndValidateConfiguration(serverURL: String, username: String, password: String) async throws -> SetupConfiguration
+}
+
+// MARK: - Setup Repository Implementation
+class SetupRepository: SetupRepositoryProtocol {
+    
+    // MARK: - Properties
+    private let logger = Logger.data
+    
+    // MARK: - Constants
+    private let keychainService = "com.romm.app.setup"
+    private let userDefaultsPrefix = "setup_"
+    
+    // UserDefaults Keys
+    private let setupConfigurationKey = "setup_configuration_json"
+    
+    // MARK: - Public Methods
+    
+    func saveSetupConfiguration(_ config: SetupConfiguration) throws {
+        logger.info("Saving setup configuration as JSON...")
+        logger.debug("Server URL: \(config.serverURL)")
+        logger.debug("Username: \(config.username)")
+        logger.debug("Setup Date: \(config.setupDate)")
+        logger.debug("Version: \(config.version)")
+        logger.debug("Has Password: \(config.password != nil)")
+        logger.debug("Has Token: \(config.token != nil)")
+        logger.debug("Has Refresh Token: \(config.refreshToken != nil)")
+        
+        do {
+            let jsonData = try JSONEncoder().encode(config)
+            let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
+            
+            UserDefaults.standard.set(jsonString, forKey: setupConfigurationKey)
+            
+            logger.debug("JSON data size: \(jsonData.count) bytes")
+            logger.info("Setup configuration saved as JSON successfully")
+            
+        } catch {
+            logger.error("Failed to encode configuration as JSON: \(error)")
+            throw SetupRepositoryError.invalidData
+        }
+    }
+    
+    func getSetupConfiguration() -> SetupConfiguration? {
+        logger.debug("Reading setup configuration from JSON...")
+        
+        guard let jsonString = UserDefaults.standard.string(forKey: setupConfigurationKey),
+              !jsonString.isEmpty else {
+            logger.warning("No setup configuration JSON found")
+            return nil
+        }
+        
+        guard let jsonData = jsonString.data(using: .utf8) else {
+            logger.error("Failed to convert JSON string to data")
+            return nil
+        }
+        
+        do {
+            let config = try JSONDecoder().decode(SetupConfiguration.self, from: jsonData)
+            
+            logger.info("Setup configuration loaded from JSON")
+            logger.debug("Server URL: \(config.serverURL)")
+            logger.debug("Username: \(config.username)")
+            logger.debug("Has Password: \(config.password != nil)")
+            logger.debug("Has Access Token: \(config.token != nil)")
+            logger.debug("Has Refresh Token: \(config.refreshToken != nil)")
+            logger.debug("Setup Date: \(config.setupDate)")
+            logger.debug("Version: \(config.version)")
+            
+            return config
+            
+        } catch {
+            logger.error("Failed to decode configuration from JSON: \(error)")
+            return nil
+        }
+    }
+    
+    func isSetupComplete() -> Bool {
+        let config = getSetupConfiguration()
+        let isComplete = config != nil
+        logger.debug("Setup complete check: \(isComplete)")
+        return isComplete
+    }
+    
+    func clearSetupConfiguration() throws {
+        logger.info("Clearing setup configuration...")
+        
+        // Clear JSON configuration from UserDefaults
+        // UserDefaults.standard.removeObject(forKey: setupConfigurationKey)
+        
+        logger.info("Setup configuration cleared")
+    }
+    
+    func updateToken(_ token: String) throws {
+        logger.info("Updating token...")
+        
+        // Load current configuration
+        guard let config = getSetupConfiguration() else {
+            logger.error("No existing configuration to update")
+            throw SetupRepositoryError.dataNotFound
+        }
+        
+        // Create new configuration with updated token
+        let updatedConfig = SetupConfiguration(
+            serverURL: config.serverURL,
+            username: config.username,
+            password: config.password,
+            token: token,
+            refreshToken: config.refreshToken,
+            setupDate: config.setupDate,
+            version: config.version
+        )
+        
+        // Save updated configuration
+        try saveSetupConfiguration(updatedConfig)
+        logger.info("Token updated in JSON configuration")
+    }
+    
+    func saveAndValidateConfiguration(serverURL: String, username: String, password: String) async throws -> SetupConfiguration {
+        logger.info("Starting configuration validation and save...")
+        logger.debug("Server URL: \(serverURL)")
+        logger.debug("Username: \(username)")
+        
+        // Clean URL
+        let cleanURL = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Test API connection with Basic Auth and get token
+        let token = try await validateBasicAuthConnection(serverURL: cleanURL, username: username, password: password)
+        
+        // Create configuration with current timestamp and version
+        let setupConfig = SetupConfiguration(
+            serverURL: cleanURL,
+            username: username,
+            password: password,
+            token: token,
+            refreshToken: nil,
+            setupDate: Date(),
+            version: getCurrentAppVersion()
+        )
+        
+        // Save to storage
+        try saveSetupConfiguration(setupConfig)
+        
+        logger.info("Configuration validated and saved successfully")
+        return setupConfig
+    }
+    
+    // MARK: - Private Helper Methods
+    
+    private func validateBasicAuthConnection(serverURL: String, username: String, password: String) async throws -> String {
+        logger.info("Validating Basic Auth connection and getting token...")
+        
+        // First, try to get a token via OAuth2
+        guard let tokenURL = URL(string: "\(serverURL)/api/token") else {
+            logger.error("Invalid token URL: \(serverURL)/api/token")
+            throw SetupRepositoryError.invalidData
+        }
+        
+        logger.debug("Getting token from: \(tokenURL.absoluteString)")
+        
+        var request = URLRequest(url: tokenURL)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 30.0
+        
+        // OAuth2 form parameters
+        let formParameters = [
+            "grant_type=password",
+            "username=\(username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")",
+            "password=\(password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")",
+            "scope="
+        ]
+        let formData = formParameters.joined(separator: "&")
+        guard let httpBody = formData.data(using: .utf8) else {
+            logger.error("Failed to encode form data")
+            throw SetupRepositoryError.invalidData
+        }
+        request.httpBody = httpBody
+        
+        logger.debug("Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        logger.debug("Request body: \(formData)")
+        
+        do {
+            logger.debug("Sending token request...")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            logger.debug("Response received")
+            logger.debug("Response data size: \(data.count) bytes")
+            logger.debug("Response data: \(String(data: data, encoding: .utf8) ?? "nil")")
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                logger.error("Not an HTTP response")
+                throw SetupRepositoryError.dataNotFound
+            }
+            
+            logger.debug("HTTP Status Code: \(httpResponse.statusCode)")
+            
+            switch httpResponse.statusCode {
+            case 200...299:
+                // Parse token response
+                guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let accessToken = json["access_token"] as? String else {
+                    logger.error("No access token in response")
+                    throw SetupRepositoryError.invalidData
+                }
+                
+                logger.info("Token received successfully")
+                logger.debug("Token length: \(accessToken.count)")
+                return accessToken
+                
+            case 401:
+                logger.error("Authentication failed - invalid credentials")
+                throw SetupRepositoryError.invalidData
+                
+            default:
+                logger.error("Token request failed with status: \(httpResponse.statusCode)")
+                throw SetupRepositoryError.dataNotFound
+            }
+            
+        } catch let error as URLError {
+            logger.error("URLError: \(error.localizedDescription)")
+            throw SetupRepositoryError.dataNotFound
+        } catch let error as SetupRepositoryError {
+            throw error
+        } catch {
+            logger.error("Unexpected error: \(error)")
+            throw SetupRepositoryError.dataNotFound
+        }
+    }
+    
+    private func getCurrentAppVersion() -> String {
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+    
+    // MARK: - Private Keychain Methods
+    
+    private func saveToKeychain(key: String, value: String) throws {
+        let data = value.data(using: .utf8)!
+        
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: keychainService,
+            kSecValueData as String: data
+        ]
+        
+        // Delete existing item first
+        SecItemDelete(query as CFDictionary)
+        
+        // Add new item
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            logger.error("Keychain save error: \(status)")
+            throw SetupRepositoryError.keychainError(status)
+        }
+    }
+    
+    private func getFromKeychain(key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: keychainService,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        
+        var dataTypeRef: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
+        
+        guard status == errSecSuccess,
+              let data = dataTypeRef as? Data,
+              let value = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        
+        return value
+    }
+    
+    private func removeFromKeychain(key: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: keychainService
+        ]
+        
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            logger.error("Keychain delete error: \(status)")
+            throw SetupRepositoryError.keychainError(status)
+        }
+    }
+}
+
+// MARK: - Setup Repository Error
+enum SetupRepositoryError: LocalizedError {
+    case keychainError(OSStatus)
+    case dataNotFound
+    case invalidData
+    
+    var errorDescription: String? {
+        switch self {
+        case .keychainError(let status):
+            return "Keychain error: \(status)"
+        case .dataNotFound:
+            return "Setup data not found"
+        case .invalidData:
+            return "Invalid setup data"
+        }
+    }
+}

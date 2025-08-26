@@ -1,0 +1,160 @@
+//
+//  PlatformsView.swift
+//  romm
+//
+//  Created by Ilyas Hallak on 07.08.25.
+//
+
+import SwiftUI
+
+struct PlatformsView: View {
+
+    @StateObject private var platformsViewModel = PlatformsViewModel()
+
+    @EnvironmentObject var appData: AppData
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                if platformsViewModel.isLoading && platformsViewModel.platforms.isEmpty {
+                    LoadingView(message: "Loading platforms...")
+                } else if platformsViewModel.platforms.isEmpty {
+                    EmptyPlatformsView()
+                } else {
+                    PlatformListView(
+                        platforms: platformsViewModel.platforms,
+                        isLoading: platformsViewModel.isLoading,
+                        viewModel: platformsViewModel
+                    )
+                }
+            }
+            .navigationTitle("Platforms")
+            .alert("Error", isPresented: .constant(platformsViewModel.errorMessage != nil)) {
+                Button("Retry") {
+                    Task {
+                        await platformsViewModel.refreshPlatforms()
+                    }
+                    platformsViewModel.clearError()
+                }
+                Button("OK") {
+                    platformsViewModel.clearError()
+                }
+            } message: {
+                Text(platformsViewModel.errorMessage ?? "An error occurred")
+            }
+        }
+    }
+}
+
+struct PlatformListView: View {
+    let platforms: [Platform]
+    let isLoading: Bool
+    let viewModel: PlatformsViewModel
+    
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(platforms) { platform in
+                    NavigationLink {
+                        PlatformDetailView(platform: platform)
+                    } label: {
+                        PlatformRowView(platform: platform)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding()
+        }
+        .refreshable {
+            await viewModel.refreshPlatforms()
+        }
+    }
+}
+
+struct PlatformRowView: View {
+    let platform: Platform
+    
+    var body: some View {
+        HStack {
+            // Platform Logo
+            Image(platform.slug)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 60, height: 60)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            
+            
+            // Platform Info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(platform.name)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                
+                Text("\(platform.romCount) ROMs")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            // Navigation Indicator
+            Image(systemName: "chevron.right")
+                .foregroundColor(.secondary)
+                .font(.caption)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(.separator), lineWidth: 0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+}
+
+struct EmptyPlatformsView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "gamecontroller")
+                .font(.system(size: 80))
+                .foregroundColor(.secondary)
+            
+            VStack(spacing: 8) {
+                Text("No Platforms Found")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text("Add some platforms to get started with your ROM collection")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct PlatformsLoadingView: View {
+    let message: String
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.2)
+            Text(message)
+                .font(.body)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+#Preview {
+    PlatformsView()
+        .environmentObject(AppData())
+}

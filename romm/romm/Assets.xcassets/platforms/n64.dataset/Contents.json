@@ -1,0 +1,12 @@
+{
+  "data" : [
+    {
+      "filename" : "n64.ico",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

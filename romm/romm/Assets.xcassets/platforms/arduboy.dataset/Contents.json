@@ -1,0 +1,12 @@
+{
+  "data" : [
+    {
+      "filename" : "arduboy.ico",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

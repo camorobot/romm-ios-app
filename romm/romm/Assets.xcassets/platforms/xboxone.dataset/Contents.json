@@ -1,0 +1,12 @@
+{
+  "data" : [
+    {
+      "filename" : "xboxone.ico",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

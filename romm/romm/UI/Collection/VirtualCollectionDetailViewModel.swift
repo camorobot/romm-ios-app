@@ -1,0 +1,37 @@
+//
+//  VirtualCollectionDetailViewModel.swift
+//  romm
+//
+//  Created by Ilyas Hallak on 23.08.25.
+//
+
+import Foundation
+
+@MainActor
+class VirtualCollectionDetailViewModel: ObservableObject {
+    private let logger = Logger.viewModel
+    @Published var viewState: ViewState = .loading
+    
+    private var virtualCollectionId: String
+    
+    enum ViewState {
+        case loading
+        case loaded
+        case error(String)
+    }
+    
+    init(virtualCollectionId: String) {
+        self.virtualCollectionId = virtualCollectionId
+    }
+    
+    func loadVirtualCollection() async {
+        viewState = .loading
+        
+        // TODO: Implement actual virtual collection loading logic
+        // For now, just simulate loading
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
+        
+        viewState = .loaded
+        logger.info("Virtual collection \(virtualCollectionId) loaded")
+    }
+}

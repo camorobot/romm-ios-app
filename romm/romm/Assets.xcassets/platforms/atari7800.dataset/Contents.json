@@ -1,0 +1,12 @@
+{
+  "data" : [
+    {
+      "filename" : "atari7800.ico",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

@@ -1,0 +1,83 @@
+//
+//  SaveSetupConfigurationUseCase.swift
+//  romm
+//
+//  Created by Ilyas Hallak on 07.08.25.
+//
+
+import Foundation
+import os
+
+protocol SaveSetupConfigurationUseCaseProtocol {
+    func execute(serverURL: String, username: String, password: String) async throws -> SetupConfiguration
+}
+
+class SaveSetupConfigurationUseCase: SaveSetupConfigurationUseCaseProtocol {
+    private let logger = Logger.general
+    private let setupRepository: SetupRepositoryProtocol
+    
+    init(setupRepository: SetupRepositoryProtocol) {
+        self.setupRepository = setupRepository
+    }
+    
+    func execute(serverURL: String, username: String, password: String) async throws -> SetupConfiguration {
+        logger.info("Starting setup configuration save...")
+        
+        // Validate input
+        guard !serverURL.isEmpty, !username.isEmpty, !password.isEmpty else {
+            throw SetupUseCaseError.invalidInput
+        }
+        
+        guard isValidURL(serverURL) else {
+            throw SetupUseCaseError.invalidURL
+        }
+        
+        do {
+            // Repository handles API validation and storage
+            let setupConfig = try await setupRepository.saveAndValidateConfiguration(
+                serverURL: serverURL,
+                username: username,
+                password: password
+            )
+            
+            logger.info("Setup configuration saved successfully")
+            return setupConfig
+            
+        } catch {
+            logger.error("Failed to save setup configuration: \(error)")
+            throw error
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    private func isValidURL(_ string: String) -> Bool {
+        guard let url = URL(string: string) else { return false }
+        return url.scheme?.hasPrefix("http") == true && url.host != nil
+    }
+    
+    private func getCurrentAppVersion() -> String {
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+}
+
+// MARK: - Setup Use Case Errors
+enum SetupUseCaseError: LocalizedError {
+    case invalidInput
+    case invalidURL
+    case authenticationFailed
+    case saveFailed
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidInput:
+            return "Invalid input - please check server URL, username, and password"
+        case .invalidURL:
+            return "Invalid server URL - must start with http:// or https://"
+        case .authenticationFailed:
+            return "Authentication failed - please check your credentials"
+        case .saveFailed:
+            return "Failed to save setup configuration"
+        }
+    }
+}
