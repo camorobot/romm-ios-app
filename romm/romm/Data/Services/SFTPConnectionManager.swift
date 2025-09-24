@@ -76,7 +76,10 @@ class SFTPConnectionManager: ObservableObject {
         
         // Explicitly ensure types are correct
         let statusEntry: (status: ConnectionStatus, lastChecked: Date) = (status: status, lastChecked: Date())
-        connectionStatusCache.updateValue(statusEntry, forKey: cacheKey)        
+        
+        DispatchQueue.main.async {
+            self.connectionStatusCache.updateValue(statusEntry, forKey: cacheKey)
+        }
         
         await MainActor.run {
             self.connectionStatuses[cacheKey] = status

@@ -10,19 +10,13 @@ import os
 
 struct AppView: View {
     private let logger = Logger.ui
-    @StateObject private var appViewModel = AppViewModel()
+    @State private var appViewModel = AppViewModel()
     
     var body: some View {
         Group {
             switch appViewModel.appState {
             case .loading:
-                VStack {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                    Text("Loading...")
-                        .padding(.top, 16)
-                        .foregroundColor(.secondary)
-                }
+                LoadingView("Loading...")
                 .onAppear {
                     Task {
                         await appViewModel.checkInitialState()
@@ -30,8 +24,7 @@ struct AppView: View {
                 }
                 
             case .setup:
-                SetupView()
-                    .environmentObject(appViewModel)
+                SetupView(appViewModel: appViewModel)
                 
             case .authenticated:
                 MainTabView()

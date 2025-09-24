@@ -8,88 +8,158 @@
 import SwiftUI
 
 struct CollectionView: View {
-    @StateObject private var collectionsViewModel = CollectionsViewModel()
-    @StateObject private var userViewModel = UserViewModel()
+    @State private var collectionsViewModel = CollectionsViewModel()
     @EnvironmentObject var appData: AppData
     
     var body: some View {
-        NavigationView {
-            VStack {
-                if collectionsViewModel.isLoading {
-                    ProgressView("Loading collections...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if collectionsViewModel.collections.isEmpty && collectionsViewModel.virtualCollections.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "books.vertical")
-                            .font(.system(size: 60))
-                            .foregroundColor(.secondary)
-                        Text("No Collections found")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                        Text("Your collections will appear here")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    List {
-                        // Virtual Collections Section
-                        if !collectionsViewModel.virtualCollections.isEmpty {
-                            Section("Virtual Collections") {
-                                ForEach(collectionsViewModel.virtualCollections, id: \.id) { virtualCollection in
-                                    NavigationLink {
-                                        VirtualCollectionDetailView(virtualCollection: virtualCollection)
-                                    } label: {
-                                        VirtualCollectionRowView(virtualCollection: virtualCollection)
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Custom Collections Section
-                        if !collectionsViewModel.collections.isEmpty {
-                            Section("Custom Collections") {
-                                ForEach(collectionsViewModel.collections, id: \.id) { collection in
-                                    NavigationLink {
-                                        CollectionDetailView(collection: collection)
-                                    } label: {
-                                        CollectionRowView(collection: collection)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .refreshable {
-                        await collectionsViewModel.refreshCollections()
+        VStack {
+            switch collectionsViewModel.viewState {
+            case .loading:
+                loadingView
+            case .empty:
+                emptyView
+            case .loaded, .loadingMore:
+                collectionsListView
+            }
+        }
+        .navigationTitle("Collections")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Add") {
+                    collectionsViewModel.showCreateCollection()
+                }
+            }
+        }
+        .sheet(isPresented: $collectionsViewModel.showingCreateCollection) {
+            CreateCollectionView { createdCollection in
+                collectionsViewModel.onCollectionCreated(createdCollection)
+            }
+        }
+        .alert("Error", isPresented: .constant(collectionsViewModel.errorMessage != nil)) {
+            Button("OK") {
+                collectionsViewModel.clearError()
+            }
+        } message: {
+            Text(collectionsViewModel.errorMessage ?? "")
+        }
+        .alert("Delete Collection", isPresented: .constant(collectionsViewModel.collectionToDelete != nil)) {
+            Button("Delete", role: .destructive) {
+                if let collection = collectionsViewModel.collectionToDelete {
+                    Task {
+                        await collectionsViewModel.deleteCollection(collection)
                     }
                 }
             }
-            .navigationTitle("Collections")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(action: { userViewModel.logout() }) {
-                            Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
-                        }
-                        
-                        if let user = appData.currentUser {
-                            Section {
-                                Text("Logged in as \(user.username)")
-                                    .foregroundColor(.secondary)
-                            }
-                        }
+            Button("Cancel", role: .cancel) {
+                collectionsViewModel.hideDeleteConfirmation()
+            }
+        } message: {
+            if let collection = collectionsViewModel.collectionToDelete {
+                Text("Are you sure you want to delete '\(collection.name)'? This action cannot be undone.")
+            }
+        }
+    }
+    
+    // MARK: - View Builders
+    
+    @ViewBuilder
+    private var loadingView: some View {
+        LoadingView("Loading collections...")
+    }
+    
+    @ViewBuilder
+    private var emptyView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "books.vertical")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            Text("No Collections found")
+                .font(.title2)
+                .foregroundColor(.secondary)
+            Text("Your collections will appear here")
+                .font(.body)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    @ViewBuilder
+    private var collectionsListView: some View {
+        List {
+            virtualCollectionsSection
+            customCollectionsSection
+            loadingMoreIndicator
+        }
+        .refreshable {
+            await collectionsViewModel.refreshCollections()
+        }
+        .task {
+            // Load collections if not already loaded
+            if collectionsViewModel.collections.isEmpty && collectionsViewModel.virtualCollections.isEmpty && !collectionsViewModel.isLoading {
+                await collectionsViewModel.refreshCollections()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var virtualCollectionsSection: some View {
+        if !collectionsViewModel.virtualCollections.isEmpty {
+            Section("Virtual Collections") {
+                ForEach(collectionsViewModel.virtualCollections, id: \.id) { virtualCollection in
+                    NavigationLink {
+                        VirtualCollectionDetailView(virtualCollection: virtualCollection)
                     } label: {
-                        Image(systemName: "person.circle")
+                        VirtualCollectionRowView(virtualCollection: virtualCollection)
                     }
                 }
             }
-            .alert("Error", isPresented: .constant(collectionsViewModel.errorMessage != nil)) {
-                Button("OK") {
-                    collectionsViewModel.clearError()
+        }
+    }
+    
+    @ViewBuilder
+    private var customCollectionsSection: some View {
+        if !collectionsViewModel.collections.isEmpty {
+            Section("Custom Collections") {
+                ForEach(collectionsViewModel.collections, id: \.id) { collection in
+                    NavigationLink {
+                        CollectionDetailView(collection: collection)
+                    } label: {
+                        CollectionRowView(collection: collection)
+                    }
+                    .onAppear {
+                        // Load more when approaching the end
+                        if collection == collectionsViewModel.collections.last {
+                            Task {
+                                await collectionsViewModel.loadMoreCollectionsIfNeeded()
+                            }
+                        }
+                    }
                 }
-            } message: {
-                Text(collectionsViewModel.errorMessage ?? "")
+                .onDelete { indexSet in
+                    if let index = indexSet.first {
+                        let collection = collectionsViewModel.collections[index]
+                        collectionsViewModel.showDeleteConfirmation(for: collection)
+                    }
+                }
             }
+        }
+    }
+    
+    @ViewBuilder
+    private var loadingMoreIndicator: some View {
+        if collectionsViewModel.isLoadingMore {
+            HStack {
+                Spacer()
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading more...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            .padding()
         }
     }
 }
@@ -135,18 +205,10 @@ struct CollectionRowView: View {
             
             Spacer()
             
-            VStack(spacing: 4) {
-                if collection.isFavorite {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
-                
-                if !collection.isPublic {
-                    Image(systemName: "lock.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                }
+            if collection.isPublic {
+                Image(systemName: "globe")
+                    .foregroundColor(.accentColor)
+                    .font(.caption)
             }
         }
         .padding(.vertical, 4)
@@ -182,20 +244,6 @@ struct VirtualCollectionRowView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(2)
-                }
-            }
-            
-            Spacer()
-            
-            VStack(spacing: 4) {
-                Image(systemName: "sparkles")
-                    .foregroundColor(.purple)
-                    .font(.caption)
-                
-                if virtualCollection.isFavorite {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.red)
-                        .font(.caption)
                 }
             }
         }

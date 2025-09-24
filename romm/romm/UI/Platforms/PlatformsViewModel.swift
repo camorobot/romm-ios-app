@@ -6,12 +6,14 @@
 //
 
 import Foundation
+import Observation
 
+@Observable
 @MainActor
-class PlatformsViewModel: ObservableObject {
-    @Published var platforms: [Platform] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
+class PlatformsViewModel {
+    var platforms: [Platform] = []
+    var isLoading: Bool = false
+    var errorMessage: String?
     
     private let getPlatformsUseCase: GetPlatformsUseCase
     private let addPlatformUseCase: AddPlatformUseCase
@@ -25,18 +27,19 @@ class PlatformsViewModel: ObservableObject {
     }
     
     private func loadPlatforms() {
-        isLoading = true
-        errorMessage = nil
-        
         Task {
+            isLoading = true
+            errorMessage = nil
+            
             do {
+                try Task.checkCancellation()
                 let platforms = try await getPlatformsUseCase.execute()
-                await MainActor.run {
-                    self.platforms = platforms
-                    self.isLoading = false
-                }
+                try Task.checkCancellation()
+                
+                self.platforms = platforms
+                self.isLoading = false
             } catch {
-                await MainActor.run {
+                if !Task.isCancelled {
                     self.isLoading = false
                     self.errorMessage = error.localizedDescription
                 }
@@ -47,16 +50,23 @@ class PlatformsViewModel: ObservableObject {
     func refreshPlatforms() async {
         guard !isLoading else { return }
         
-        isLoading = true
-        errorMessage = nil
-        
-        do {
-            let platforms = try await getPlatformsUseCase.execute()
-            self.platforms = platforms
-            isLoading = false
-        } catch {
-            isLoading = false
-            errorMessage = error.localizedDescription
+        Task {
+            isLoading = true
+            errorMessage = nil
+            
+            do {
+                try Task.checkCancellation()
+                let platforms = try await getPlatformsUseCase.execute()
+                try Task.checkCancellation()
+                
+                self.platforms = platforms
+                isLoading = false
+            } catch {
+                if !Task.isCancelled {
+                    isLoading = false
+                    errorMessage = error.localizedDescription
+                }
+            }
         }
     }
     
@@ -83,4 +93,5 @@ class PlatformsViewModel: ObservableObject {
     func clearError() {
         errorMessage = nil
     }
+    
 }

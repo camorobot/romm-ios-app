@@ -6,16 +6,18 @@
 //
 
 import Foundation
+import Observation
 
+@Observable
 @MainActor
-class CollectionDetailViewModel: ObservableObject {
+class CollectionDetailViewModel {
     private let logger = Logger.viewModel
-    @Published var viewState: RomViewState = .loading
-    @Published var charIndex: [String: Int] = [:]
-    @Published var selectedChar: String? = nil
-    @Published var currentOrderBy: String = "name"
-    @Published var currentOrderDir: String = "asc"
-    @Published var canLoadMore: Bool = false
+    var viewState: RomViewState = .loading
+    var charIndex: [String: Int] = [:]
+    var selectedChar: String? = nil
+    var currentOrderBy: String = "name"
+    var currentOrderDir: String = "asc"
+    var canLoadMore: Bool = false
     
     private let getRomsUseCase: GetRomsUseCase
     private var collectionId: Int

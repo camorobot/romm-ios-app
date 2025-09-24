@@ -7,6 +7,30 @@
 
 import Foundation
 
+struct SiblingRom: Identifiable, Equatable {
+    let id: Int
+    let name: String?
+    let fsNameNoTags: String
+    let fsNameNoExt: String
+    let sortComparator: String
+    
+    var displayName: String {
+        return name ?? fsNameNoExt
+    }
+    
+    var displayNameWithExtension: String {
+        // Use fsNameNoTags as it contains the most specific filename info including disc/cd info
+        // If fsNameNoTags is empty, fallback to name or fsNameNoExt
+        if !fsNameNoTags.isEmpty {
+            return fsNameNoTags
+        } else if let name = name, !name.isEmpty {
+            return name
+        } else {
+            return fsNameNoExt
+        }
+    }
+}
+
 struct Rom: Identifiable, Equatable {
     let id: Int
     let name: String
@@ -26,6 +50,7 @@ struct Rom: Identifiable, Equatable {
     let languages: [String]
     let regions: [String]
     let fileName: String?
+    let platformSlug: String?
     
     var platform: Platform? = nil
     
@@ -45,7 +70,8 @@ struct Rom: Identifiable, Equatable {
         rating: Double? = nil,
         languages: [String] = [],
         regions: [String] = [],
-        fileName: String? = nil
+        fileName: String? = nil,
+        platformSlug: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -63,6 +89,7 @@ struct Rom: Identifiable, Equatable {
         self.languages = languages
         self.regions = regions
         self.fileName = fileName
+        self.platformSlug = platformSlug
     }
 }
 
@@ -70,6 +97,8 @@ struct RomDetails: Identifiable, Equatable {
     let id: Int
     let name: String
     let fileName: String?
+    let fsNameNoExt: String?
+    let fsName: String?
     let summary: String?
     let urlCover: String?
     let platformId: Int
@@ -84,11 +113,22 @@ struct RomDetails: Identifiable, Equatable {
     let sha1Hash: String?
     let md5Hash: String?
     let crcHash: String?
+    let franchises: [String]
+    
+    // Extended metadata from metadatum object
+    let companies: [String]
+    let gameModes: [String]
+    let ageRatings: [String]
+    let averageRating: Double?
+    let platformDisplayName: String
+    let siblings: [SiblingRom]
     
     init(
         id: Int,
         name: String,
         fileName: String? = nil,
+        fsNameNoExt: String? = nil,
+        fsName: String? = nil,
         summary: String? = nil,
         urlCover: String? = nil,
         platformId: Int,
@@ -102,11 +142,20 @@ struct RomDetails: Identifiable, Equatable {
         sizeBytes: Int? = nil,
         sha1Hash: String? = nil,
         md5Hash: String? = nil,
-        crcHash: String? = nil
+        crcHash: String? = nil,
+        franchises: [String] = [],
+        companies: [String] = [],
+        gameModes: [String] = [],
+        ageRatings: [String] = [],
+        averageRating: Double? = nil,
+        platformDisplayName: String,
+        siblings: [SiblingRom] = []
     ) {
         self.id = id
         self.name = name
         self.fileName = fileName
+        self.fsNameNoExt = fsNameNoExt
+        self.fsName = fsName
         self.summary = summary
         self.urlCover = urlCover
         self.platformId = platformId
@@ -121,5 +170,12 @@ struct RomDetails: Identifiable, Equatable {
         self.sha1Hash = sha1Hash
         self.md5Hash = md5Hash
         self.crcHash = crcHash
+        self.franchises = franchises
+        self.companies = companies
+        self.gameModes = gameModes
+        self.ageRatings = ageRatings
+        self.averageRating = averageRating
+        self.platformDisplayName = platformDisplayName
+        self.siblings = siblings
     }
 }

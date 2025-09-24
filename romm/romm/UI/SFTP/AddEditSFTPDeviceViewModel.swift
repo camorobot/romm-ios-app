@@ -19,7 +19,8 @@ class AddEditSFTPDeviceViewModel {
     var isTestingConnection = false
     var testResult: ConnectionStatus?
     
-    private let sftpUseCases: SFTPUseCases
+    private let getCredentialsUseCase: GetCredentialsUseCase
+    private let testConnectionUseCase: TestConnectionUseCase
     private var editingConnection: SFTPConnection?
     
     var isEditing: Bool {
@@ -47,8 +48,13 @@ class AddEditSFTPDeviceViewModel {
         }
     }
     
-    init(connection: SFTPConnection? = nil, sftpUseCases: SFTPUseCases) {
-        self.sftpUseCases = sftpUseCases
+    init(
+        connection: SFTPConnection? = nil,
+        getCredentialsUseCase: GetCredentialsUseCase,
+        testConnectionUseCase: TestConnectionUseCase
+    ) {
+        self.getCredentialsUseCase = getCredentialsUseCase
+        self.testConnectionUseCase = testConnectionUseCase
         self.editingConnection = connection
         
         if let connection = connection {
@@ -66,7 +72,7 @@ class AddEditSFTPDeviceViewModel {
         isDefault = connection.isDefault
         
         // Load credentials from keychain
-        if let credentials = sftpUseCases.getCredentials(for: connection.id) {
+        if let credentials = getCredentialsUseCase.execute(for: connection.id) {
             password = credentials.password ?? ""
             privateKey = credentials.privateKey ?? ""
             passphrase = credentials.passphrase ?? ""
@@ -87,7 +93,7 @@ class AddEditSFTPDeviceViewModel {
         let testCredentials = createCredentials()
         
         do {
-            let isConnected = try await sftpUseCases.testConnection(testConnection, credentials: testCredentials)
+            let isConnected = try await testConnectionUseCase.executeWithCredentialsThrows(testConnection, credentials: testCredentials)
             testResult = isConnected ? .connected : .error
             
             if !isConnected {

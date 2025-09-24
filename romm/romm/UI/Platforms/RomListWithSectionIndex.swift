@@ -25,6 +25,7 @@ struct RomListWithSectionIndex: View {
     let platform: Platform? // Platform information for displaying icons
     
     @State private var loadMoreTriggeredRoms: Set<Int> = []
+    @State private var lastRomCount: Int = 0
     
     var body: some View {
         Group {
@@ -70,13 +71,23 @@ struct RomListWithSectionIndex: View {
                                     ], spacing: 16) {
                                         ForEach(section.roms) { rom in
                                             NavigationLink {
-                                                RomDetailView2(rom: rom)
+                                                RomDetailView(rom: rom)
                                             } label: {
                                                 BigRomCardView(rom: rom, platform: platform)
+                                                    .background(
+                                                        RoundedRectangle(cornerRadius: 16)
+                                                            .fill(Color(.systemBackground))
+                                                            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                                                    )
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 16)
+                                                            .stroke(Color(.separator).opacity(0.2), lineWidth: 0.5)
+                                                    )                                                    
                                             }
+                                            .buttonStyle(CardButtonStyle())
                                             .onAppear {
                                                 // Trigger load more when reaching the last item in the entire list
-                                                if isLastRomInList(rom: rom) && !loadMoreTriggeredRoms.contains(rom.id) {
+                                                if isLastRomInList(rom: rom) && canLoadMore && !loadMoreTriggeredRoms.contains(rom.id) {
                                                     loadMoreTriggeredRoms.insert(rom.id)
                                                     Task {
                                                         await onLoadMore?()
@@ -90,14 +101,15 @@ struct RomListWithSectionIndex: View {
                                     // List layout for small cards
                                     ForEach(section.roms) { rom in
                                         NavigationLink {
-                                            RomDetailView2(rom: rom)
+                                            RomDetailView(rom: rom)
                                         } label: {
                                             romRowView(rom: rom)
                                         }
+                                        .buttonStyle(PlainButtonStyle())
                                         .padding(.horizontal, 16)
                                         .onAppear {
                                             // Trigger load more when reaching the last item in the entire list
-                                            if isLastRomInList(rom: rom) && !loadMoreTriggeredRoms.contains(rom.id) {
+                                            if isLastRomInList(rom: rom) && canLoadMore && !loadMoreTriggeredRoms.contains(rom.id) {
                                                 loadMoreTriggeredRoms.insert(rom.id)
                                                 Task {
                                                     await onLoadMore?()
@@ -137,6 +149,20 @@ struct RomListWithSectionIndex: View {
                         Spacer()
                     }
                 }
+            }
+        }
+        .onAppear {
+            // Reset triggered roms when the rom count changes (new data loaded)
+            if lastRomCount != roms.count {
+                loadMoreTriggeredRoms.removeAll()
+                lastRomCount = roms.count
+            }
+        }
+        .onChange(of: roms.count) { oldValue, newValue in
+            // Clear triggered roms when new data is loaded
+            if newValue != oldValue {
+                loadMoreTriggeredRoms.removeAll()
+                lastRomCount = newValue
             }
         }
     }
@@ -209,7 +235,17 @@ struct RomListWithSectionIndex: View {
         }
         return rom.id == lastRom.id
     }
-    
+}
+
+// MARK: - Button Styles
+
+struct CardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Self.Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .opacity(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+    }
 }
 
 // MARK: - Data Models
@@ -247,8 +283,8 @@ struct SmallRomListRowView: View {
                     .fontWeight(.medium)
                     .lineLimit(1)
                 
-                if let year = rom.releaseYear {
-                    Text("\(year)")
+                if let year = rom.releaseYear?.description {
+                    Text(year)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -289,8 +325,8 @@ struct BigRomListRowView: View {
                     .fontWeight(.semibold)
                     .lineLimit(2)
                 
-                if let year = rom.releaseYear {
-                    Text("\(year)")
+                if let year = rom.releaseYear?.description {
+                    Text(year)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -426,18 +462,16 @@ struct RomTableView: View {
                     sortableHeaderButton("Added", field: .added, width: 100, alignment: .center)
                     sortableHeaderButton("Released", field: .released, width: 80, alignment: .center)
                     sortableHeaderButton("Rating", field: .rating, width: 70, alignment: .center)
-                    Text("Languages").font(.headline).fontWeight(.semibold).frame(width: 120, alignment: .center)
-                    Text("Regions").font(.headline).fontWeight(.semibold).frame(width: 120, alignment: .center)
+                    staticHeaderLabel("Languages", width: 120)
+                    staticHeaderLabel("Regions", width: 120)
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical, 8)
                 .padding(.horizontal, 16)
-                .background(Color(.systemGray6))
-                .foregroundColor(.primary)
                 
                 // Data Rows - Replace Table with custom implementation
                 LazyVStack(spacing: 0) {
                     ForEach(sortedRoms) { rom in
-                        NavigationLink(destination: RomDetailView2(rom: rom)) {
+                        NavigationLink(destination: RomDetailView(rom: rom)) {
                             HStack(spacing: 0) {
                                 // Title Column
                                 HStack(spacing: 8) {
@@ -501,12 +535,12 @@ struct RomTableView: View {
                                 
                                 // Released Column
                                 Group {
-                                    if let year = rom.releaseYear {
-                                        Text("\(year)")
+                                    if let year = rom.releaseYear?.description {
+                                        Text(year)
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                     } else {
-                                        Text("—")
+                                        Text("-")
                                             .font(.caption)
                                             .foregroundColor(.accentColor)
                                     }
@@ -565,7 +599,7 @@ struct RomTableView: View {
                         }
                         .buttonStyle(.plain)
                         .padding(.vertical, 8)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 8)
                         .background(Color(.systemBackground))
                         .overlay(Rectangle().fill(Color(.separator)).frame(height: 0.5), alignment: .bottom)
                         .onAppear {
@@ -590,8 +624,8 @@ struct RomTableView: View {
                     }
                 }) {
                     HStack {
-                        ProgressView()
-                            .scaleEffect(0.8)
+                        LoadingView()
+                            .frame(width: 20, height: 20)
                         Text("Load More ROMs")
                             .font(.subheadline)
                             .fontWeight(.medium)
@@ -618,66 +652,127 @@ struct RomTableView: View {
                 LazyVStack(spacing: 0) {
                     // Header Row with Sortable Columns
                     HStack(spacing: 0) {
-                        sortableHeaderButton("Title", field: .name, width: 200, alignment: .leading)
-                        sortableHeaderButton("Rating", field: .rating, width: 70, alignment: .center)
-                        sortableHeaderButton("Size", field: .size, width: 80, alignment: .center)
-                        sortableHeaderButton("Added", field: .added, width: 100, alignment: .center)
-                        sortableHeaderButton("Released", field: .released, width: 80, alignment: .center)
-                        Text("Languages").font(.caption).fontWeight(.semibold).frame(width: 120, alignment: .center)
-                        Text("Regions").font(.caption).fontWeight(.semibold).frame(width: 120, alignment: .center)
+                        sortableHeaderButton("Title", field: .name, width: 180, alignment: .leading)
+                        sortableHeaderButton("Rating", field: .rating, width: 60, alignment: .center)
+                        sortableHeaderButton("Size", field: .size, width: 70, alignment: .center)
+                        sortableHeaderButton("Added", field: .added, width: 80, alignment: .center)
+                        sortableHeaderButton("Released", field: .released, width: 70, alignment: .center)
+                        staticHeaderLabel("Languages", width: 80)
+                        staticHeaderLabel("Regions", width: 80)
                     }
                     .padding(.vertical, 8)
-                    .padding(.horizontal, 16)
-                    .background(Color(.systemGray6))
-                    .foregroundColor(.primary)
+                    .padding(.leading, 8)
                     
                     // Data Rows
                     ForEach(sortedRoms) { rom in
-                        NavigationLink(destination: RomDetailView2(rom: rom)) {
+                        NavigationLink(destination: RomDetailView(rom: rom)) {
                             HStack(spacing: 0) {
                                 // Title Column
-                                HStack(spacing: 8) {
+                                HStack(spacing: 4) {
+                                    // Icon
                                     CachedAsyncImage(urlString: rom.urlCover) { image in
-                                        image.resizable().aspectRatio(contentMode: .fill)
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 20, height: 20)
+                                            .clipShape(RoundedRectangle(cornerRadius: 3))
                                     } placeholder: {
-                                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.2))
-                                            .overlay(Image(systemName: "gamecontroller").foregroundColor(.gray).font(.caption2))
+                                        RoundedRectangle(cornerRadius: 3)
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(width: 20, height: 20)
+                                            .overlay(
+                                                Image(systemName: "gamecontroller")
+                                                    .foregroundColor(.gray)
+                                                    .font(.caption2)
+                                            )
                                     }
-                                    .frame(width: 24, height: 24)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                    .frame(width: 20, height: 20)
                                     
                                     Text(rom.name)
-                                        .font(.caption)
+                                        .font(.body)
                                         .fontWeight(.medium)
                                         .lineLimit(1)
                                         .truncationMode(.tail)
+                                    
+                                    Spacer()
                                 }
-                                .frame(width: 200, alignment: .leading)
+                                .frame(width: 180, alignment: .leading)
                                 
-                                // Rating Column (direkt neben Title)
+                                // Rating Column
                                 Text(rom.rating != nil ? String(format: "%.1f", rom.rating!) : "—")
-                                    .font(.caption2)
+                                    .font(.caption)
+                                    .frame(width: 60, alignment: .center)
+                                    .foregroundColor(.secondary)
+                                
+                                // Size Column
+                                Text(rom.sizeBytes != nil ? formatFileSize(rom.sizeBytes!) : "—")
+                                    .font(.caption)
                                     .frame(width: 70, alignment: .center)
                                     .foregroundColor(.secondary)
                                 
-                                Text(rom.sizeBytes != nil ? formatFileSize(rom.sizeBytes!) : "—").font(.caption2).frame(width: 80, alignment: .center).foregroundColor(.secondary)
-                                Text(rom.createdAt != nil ? formatDate(rom.createdAt!) : "—").font(.caption2).frame(width: 100, alignment: .center).foregroundColor(.secondary)
-                                Text(rom.releaseYear != nil ? "\(rom.releaseYear!)" : "—").font(.caption2).frame(width: 80, alignment: .center).foregroundColor(.secondary)
+                                // Added Column
+                                Group {
+                                    if let createdAt = rom.createdAt {
+                                        Text(formatDate(createdAt))
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    } else {
+                                        Text("—")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .frame(width: 80, alignment: .center)
                                 
-                                Text(!rom.languages.isEmpty ? languageEmoji(for: rom.languages.first!) : "—").font(.caption2).frame(width: 120, alignment: .center).foregroundColor(.secondary)
-                                Text(!rom.regions.isEmpty ? flagEmoji(for: rom.regions.first!) : "—").font(.caption2).frame(width: 120, alignment: .center).foregroundColor(.secondary)
+                                // Released Column
+                                Text(rom.releaseYear != nil ? "\(rom.releaseYear!)" : "—")
+                                    .font(.caption)
+                                    .frame(width: 70, alignment: .center)
+                                    .foregroundColor(.secondary)
+                                
+                                // Languages Column
+                                Group {
+                                    if !rom.languages.isEmpty {
+                                        HStack(spacing: 2) {
+                                            ForEach(rom.languages.prefix(2), id: \.self) { language in
+                                                Text(languageEmoji(for: language))
+                                                    .font(.caption)
+                                            }
+                                        }
+                                    } else {
+                                        Text("—")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .frame(width: 80, alignment: .center)
+                                
+                                // Regions Column
+                                Group {
+                                    if !rom.regions.isEmpty {
+                                        HStack(spacing: 2) {
+                                            ForEach(rom.regions.prefix(2), id: \.self) { region in
+                                                Text(flagEmoji(for: region))
+                                                    .font(.caption)
+                                            }
+                                        }
+                                    } else {
+                                        Text("—")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .frame(width: 80, alignment: .center)
                             }
                             .foregroundColor(.primary)
                         }
                         .buttonStyle(.plain)
                         .padding(.vertical, 8)
-                        .padding(.horizontal, 16)
+                        .padding(.leading, 8)
                         .background(Color(.systemBackground))
                         .overlay(Rectangle().fill(Color(.separator)).frame(height: 0.5), alignment: .bottom)
-                        // No onAppear load-more for iPhone table - causes infinite loading
                     }
                 }
-                .frame(minWidth: 750)
                 
                 // Load More Button for iPhone Table View
                 if canLoadMore {
@@ -738,44 +833,57 @@ struct RomTableView: View {
         Button(action: {
             toggleSort(field)
         }) {
-            HStack(spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .fontWeight(currentSortField == field ? .bold : .semibold)
-                if currentSortField == field {
-                    Image(systemName: currentSortDirection == .asc ? "chevron.up" : "chevron.down")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.secondary)
-                } else {
-                    // Show faint sort indicator when not active
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.5))
+            VStack(spacing: 8) {
+                HStack(spacing: 4) {
+                    Text(title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(currentSortField == field ? .primary : .secondary)
+                    
+                    if currentSortField == field {
+                        Image(systemName: currentSortDirection == .asc ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                    } else {
+                        // Show faint sort indicator when not active
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.4))
+                    }
                 }
+                .frame(width: width, alignment: alignment)
+                
+                // Segmented control style underline
+                Rectangle()
+                    .fill(currentSortField == field ? Color.accentColor : Color.clear)
+                    .frame(height: 2)
+                    .frame(width: width) // Full width underline
+                    .animation(.easeInOut(duration: 0.3), value: currentSortField)
             }
-            .frame(width: width, alignment: alignment)
-            .padding(.vertical, 2)
-            .padding(.horizontal, 4)
+            .padding(.vertical, 12)
         }
         .buttonStyle(.plain)
-        .foregroundColor(currentSortField == field ? .secondary : .primary)
-        .background(
-            Group {
-                if currentSortField == field {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.accentColor.opacity(0.15))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 1)
-                        )
-                } else {
-                    Color.clear
-                }
-            }
-        )
-        .scaleEffect(currentSortField == field ? 1.02 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: currentSortField)
+        .contentShape(Rectangle()) // Make entire area tappable
+        // Clean look without background colors
+    }
+    
+    private func staticHeaderLabel(_ title: String, width: CGFloat) -> some View {
+        VStack(spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+                .frame(width: width, alignment: .center)
+            
+            // Empty underline space to match sortable headers
+            Rectangle()
+                .fill(Color.clear)
+                .frame(height: 2)
+                .frame(width: width)
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 8)
     }
     
     private func isLastRom(_ rom: Rom) -> Bool {

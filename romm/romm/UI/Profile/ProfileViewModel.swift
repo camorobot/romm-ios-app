@@ -2,14 +2,16 @@
 //  ProfileViewModel.swift
 //  romm
 //
-//  Created by Claude on 08.08.25.
+//  Created by Ilyas Hallak on 08.08.25.
 //
 
 import Foundation
 import os
+import Observation
 
+@Observable
 @MainActor
-class ProfileViewModel: ObservableObject {
+class ProfileViewModel {
     private let logger = Logger.viewModel
     private let logoutUseCase: LogoutUseCase
     private let clearSetupConfigurationUseCase: ClearSetupConfigurationUseCaseProtocol

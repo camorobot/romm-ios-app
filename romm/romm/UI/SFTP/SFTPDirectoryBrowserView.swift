@@ -18,24 +18,52 @@ struct SFTPDirectoryBrowserView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
-                if let romName = romName {
-                    romInfoSection
+            ZStack {
+                VStack {
+                    if !viewModel.favoriteDirectories.isEmpty {
+                        favoritesSection
+                    }
+                    
+                    if let romName = romName {
+                        compactRomInfo
+                    }
+                    
+                    pathBreadcrumb
+                    
+                    if viewModel.isLoading {
+                        ProgressView("Loading directory...")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if viewModel.directoryItems.isEmpty {
+                        emptyDirectoryView
+                    } else {
+                        directoryList
+                    }
                 }
                 
-                if !viewModel.favoriteDirectories.isEmpty {
-                    favoritesSection
-                }
-                
-                pathBreadcrumb
-                
-                if viewModel.isLoading {
-                    ProgressView("Loading directory...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if viewModel.directoryItems.isEmpty {
-                    emptyDirectoryView
-                } else {
-                    directoryList
+                // Floating Action Button
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            selectCurrentPath()
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 16, weight: .semibold))
+                                Text("Select")
+                                    .font(.system(size: 16, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color.accentColor)
+                            .clipShape(Capsule())
+                            .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 34) // Account for safe area
+                    }
                 }
             }
             .navigationTitle("Browse Directory")
@@ -45,13 +73,6 @@ struct SFTPDirectoryBrowserView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Select") {
-                        selectCurrentPath()
-                    }
-                    .buttonStyle(.borderedProminent)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -98,35 +119,21 @@ struct SFTPDirectoryBrowserView: View {
         }
     }
     
-    private var romInfoSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "gamecontroller")
-                    .foregroundColor(.accentColor)
-                Text("Uploading ROM")
-                    .font(.headline)
-                Spacer()
-            }
-            .padding(.horizontal)
+    private var compactRomInfo: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "gamecontroller")
+                .font(.caption)
+                .foregroundColor(.accentColor)
             
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(romName ?? "Unknown ROM")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .lineLimit(2)
-                    Text("Select destination folder")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
+            Text("Uploading: \(romName ?? "Unknown ROM")")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+            
+            Spacer()
         }
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
         .padding(.horizontal)
+        .padding(.vertical, 4)
     }
     
     private var favoritesSection: some View {

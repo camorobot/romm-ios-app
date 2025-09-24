@@ -11,12 +11,21 @@ class SFTPDirectoryBrowserViewModel {
     var favoriteDirectories: [String] = []
     
     private let connection: SFTPConnection
-    private let sftpUseCases: SFTPUseCases
+    private let listDirectoryUseCase: ListDirectoryUseCase
+    private let manageFavoriteDirectoriesUseCase: ManageFavoriteDirectoriesUseCase
+    private let createDirectoryUseCase: CreateSFTPDirectoryUseCase
     private var pathHistory: [String] = ["/"]
     
-    init(connection: SFTPConnection, sftpUseCases: SFTPUseCases) {
+    init(
+        connection: SFTPConnection, 
+        listDirectoryUseCase: ListDirectoryUseCase,
+        manageFavoriteDirectoriesUseCase: ManageFavoriteDirectoriesUseCase,
+        createDirectoryUseCase: CreateSFTPDirectoryUseCase
+    ) {
         self.connection = connection
-        self.sftpUseCases = sftpUseCases
+        self.listDirectoryUseCase = listDirectoryUseCase
+        self.manageFavoriteDirectoriesUseCase = manageFavoriteDirectoriesUseCase
+        self.createDirectoryUseCase = createDirectoryUseCase
         
         loadFavoriteDirectories()
     }
@@ -44,7 +53,7 @@ class SFTPDirectoryBrowserViewModel {
         error = nil
         
         do {
-            let items = try await sftpUseCases.listDirectory(at: targetPath, connection: connection)
+            let items = try await listDirectoryUseCase.execute(at: targetPath, connection: connection)
             
             directoryItems = items
             
@@ -91,17 +100,24 @@ class SFTPDirectoryBrowserViewModel {
     }
     
     func addToFavorites(_ path: String) {
+        print("🔍 SFTP Browser: Adding favorite - path: \(path), connectionId: \(connection.id)")
         do {
-            try sftpUseCases.addFavoriteDirectory(path, for: connection.id)
+            try manageFavoriteDirectoriesUseCase.addFavoriteDirectory(path, for: connection.id)
+            print("🔍 SFTP Browser: Successfully added favorite")
             loadFavoriteDirectories()
+            print("🔍 SFTP Browser: Favorites reloaded")
         } catch {
-            self.error = "Failed to add favorite: \(error.localizedDescription)"
+            let errorMsg = "Failed to add favorite: \(error.localizedDescription)"
+            print("🔍 SFTP Browser: Error adding favorite - \(errorMsg)")
+            print("🔍 SFTP Browser: Error type: \(type(of: error))")
+            print("🔍 SFTP Browser: Error details: \(error)")
+            self.error = errorMsg
         }
     }
     
     func removeFromFavorites(_ path: String) {
         do {
-            try sftpUseCases.removeFavoriteDirectory(path, for: connection.id)
+            try manageFavoriteDirectoriesUseCase.removeFavoriteDirectory(path, for: connection.id)
             loadFavoriteDirectories()
         } catch {
             self.error = "Failed to remove favorite: \(error.localizedDescription)"
@@ -121,7 +137,7 @@ class SFTPDirectoryBrowserViewModel {
         let newDirPath = currentPath.hasSuffix("/") ? "\(currentPath)\(name)" : "\(currentPath)/\(name)"
         
         do {
-            try await sftpUseCases.createDirectory(at: newDirPath, connection: connection)
+            try await createDirectoryUseCase.execute(at: newDirPath, connection: connection)
             await loadDirectory()
         } catch {
             self.error = "Failed to create directory: \(error.localizedDescription)"
@@ -129,7 +145,7 @@ class SFTPDirectoryBrowserViewModel {
     }
     
     private func loadFavoriteDirectories() {
-        favoriteDirectories = sftpUseCases.getFavoriteDirectories(for: connection.id)
+        favoriteDirectories = manageFavoriteDirectoriesUseCase.getFavoriteDirectories(for: connection.id)
     }
     
     var currentPathComponents: [String] {

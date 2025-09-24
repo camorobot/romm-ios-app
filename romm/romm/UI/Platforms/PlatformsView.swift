@@ -9,39 +9,37 @@ import SwiftUI
 
 struct PlatformsView: View {
 
-    @StateObject private var platformsViewModel = PlatformsViewModel()
+    @State private var platformsViewModel = PlatformsViewModel()
 
     @EnvironmentObject var appData: AppData
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                if platformsViewModel.isLoading && platformsViewModel.platforms.isEmpty {
-                    LoadingView(message: "Loading platforms...")
-                } else if platformsViewModel.platforms.isEmpty {
-                    EmptyPlatformsView()
-                } else {
-                    PlatformListView(
-                        platforms: platformsViewModel.platforms,
-                        isLoading: platformsViewModel.isLoading,
-                        viewModel: platformsViewModel
-                    )
-                }
+        ZStack {
+            if platformsViewModel.isLoading && platformsViewModel.platforms.isEmpty {
+                LoadingView("Loading platforms...")
+            } else if platformsViewModel.platforms.isEmpty {
+                EmptyPlatformsView()
+            } else {
+                PlatformListView(
+                    platforms: platformsViewModel.platforms,
+                    isLoading: platformsViewModel.isLoading,
+                    viewModel: platformsViewModel
+                )
             }
-            .navigationTitle("Platforms")
-            .alert("Error", isPresented: .constant(platformsViewModel.errorMessage != nil)) {
-                Button("Retry") {
-                    Task {
-                        await platformsViewModel.refreshPlatforms()
-                    }
-                    platformsViewModel.clearError()
+        }
+        .navigationTitle("Platforms")
+        .alert("Error", isPresented: .constant(platformsViewModel.errorMessage != nil)) {
+            Button("Retry") {
+                Task {
+                    await platformsViewModel.refreshPlatforms()
                 }
-                Button("OK") {
-                    platformsViewModel.clearError()
-                }
-            } message: {
-                Text(platformsViewModel.errorMessage ?? "An error occurred")
+                platformsViewModel.clearError()
             }
+            Button("OK") {
+                platformsViewModel.clearError()
+            }
+        } message: {
+            Text(platformsViewModel.errorMessage ?? "An error occurred")
         }
     }
 }
@@ -139,20 +137,6 @@ struct EmptyPlatformsView: View {
     }
 }
 
-struct PlatformsLoadingView: View {
-    let message: String
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.2)
-            Text(message)
-                .font(.body)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
 
 #Preview {
     PlatformsView()

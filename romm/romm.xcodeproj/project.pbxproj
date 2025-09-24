@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		5D2B9D042E5BA8C200F5233E /* mft.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5D2B9D032E5BA8C200F5233E /* mft.xcframework */; };
 		5D2B9D052E5BA8C200F5233E /* mft.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 5D2B9D032E5BA8C200F5233E /* mft.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		5D9D918E2E5F8F21009AF769 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 5D9D918D2E5F8F21009AF769 /* Kingfisher */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +86,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5D9D918E2E5F8F21009AF769 /* Kingfisher in Frameworks */,
 				5D2B9D042E5BA8C200F5233E /* mft.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -156,6 +158,7 @@
 			);
 			name = romm;
 			packageProductDependencies = (
+				5D9D918D2E5F8F21009AF769 /* Kingfisher */,
 			);
 			productName = romm;
 			productReference = 5DA7E4202E43D870003680D9 /* romm.app */;
@@ -239,6 +242,9 @@
 			);
 			mainGroup = 5DA7E4172E43D870003680D9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5D9D918C2E5F8F21009AF769 /* XCRemoteSwiftPackageReference "Kingfisher" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5DA7E4212E43D870003680D9 /* Products */;
 			projectDirPath = "";
@@ -442,6 +448,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = romm/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Rom Manager+";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -458,7 +465,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = de.ilyashallak.romm;
+				PRODUCT_BUNDLE_IDENTIFIER = de.ilyashallak.rommanagerplus;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -484,6 +491,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = romm/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Rom Manager+";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -500,7 +508,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = de.ilyashallak.romm;
+				PRODUCT_BUNDLE_IDENTIFIER = de.ilyashallak.rommanagerplus;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
@@ -643,6 +651,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5D9D918C2E5F8F21009AF769 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5D9D918D2E5F8F21009AF769 /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5D9D918C2E5F8F21009AF769 /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5DA7E4182E43D870003680D9 /* Project object */;
 }

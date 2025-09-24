@@ -9,6 +9,11 @@ import SwiftUI
 
 @main
 struct rommApp: App {
+    
+    init() {
+        // Initialize image cache configuration at app startup
+        _ = ImageCacheConfiguration.shared
+    }
 
     var body: some Scene {
         WindowGroup {

@@ -1,144 +1,12 @@
 import SwiftUI
+import Kingfisher
 
-// MARK: - Image Cache Manager
-
-class ImageCacheManager: ObservableObject {
-    static let shared = ImageCacheManager()
-    
-    private let urlSession: URLSession
-    private let memoryCache = NSCache<NSString, UIImage>()
-    private let settings = ImageCacheSettings.shared
-    
-    private init() {
-        // Configure URLCache with settings
-        let diskCacheURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?.appendingPathComponent("ImageCache")
-        
-        let urlCache = URLCache(
-            memoryCapacity: 20 * 1024 * 1024, // 20MB for URL cache memory
-            diskCapacity: settings.diskCacheLimitBytes,
-            directory: diskCacheURL
-        )
-        
-        // Configure URLSession with caching
-        let configuration = URLSessionConfiguration.default
-        configuration.urlCache = urlCache
-        configuration.requestCachePolicy = .returnCacheDataElseLoad
-        configuration.timeoutIntervalForRequest = 30.0
-        configuration.timeoutIntervalForResource = 60.0
-        
-        self.urlSession = URLSession(configuration: configuration)
-        
-        // Configure memory cache with settings
-        updateSettings()
-    }
-    
-    func updateSettings() {
-        memoryCache.countLimit = 500 // Maximum 200 images in memory
-        memoryCache.totalCostLimit = settings.memoryCacheLimitBytes
-        
-        // Update URLCache limits
-        if let urlCache = urlSession.configuration.urlCache {
-            urlCache.diskCapacity = settings.diskCacheLimitBytes
-        }
-    }
-    
-    func loadImage(from url: URL) async -> UIImage? {
-        // Check if caching is enabled
-        guard settings.cacheEnabled else {
-            return await loadImageDirectly(from: url)
-        }
-        
-        let cacheKey = url.absoluteString as NSString
-        
-        // Check memory cache first
-        if let cachedImage = memoryCache.object(forKey: cacheKey) {
-            return cachedImage
-        }
-        
-        do {
-            let (data, response) = try await urlSession.data(from: url)
-            
-            // Verify response
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                return nil
-            }
-            
-            // Create image from data
-            guard let image = UIImage(data: data) else {
-                return nil
-            }
-            
-            // Cache in memory if enabled
-            if settings.cacheEnabled {
-                let cost = data.count
-                memoryCache.setObject(image, forKey: cacheKey, cost: cost)
-            }
-            
-            return image
-            
-        } catch {
-            print("❌ Failed to load image from \(url): \(error)")
-            return nil
-        }
-    }
-    
-    private func loadImageDirectly(from url: URL) async -> UIImage? {
-        do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200,
-                  let image = UIImage(data: data) else {
-                return nil
-            }
-            
-            return image
-        } catch {
-            return nil
-        }
-    }
-    
-    func clearMemoryCache() {
-        memoryCache.removeAllObjects()
-    }
-    
-    func clearDiskCache() {
-        urlSession.configuration.urlCache?.removeAllCachedResponses()
-    }
-    
-    func clearAllCaches() {
-        clearMemoryCache()
-        clearDiskCache()
-    }
-    
-    func getCacheUsage() -> (memory: Int, disk: Int) {
-        let memoryUsed = memoryCache.totalCostLimit // This is an approximation
-        let diskUsed = urlSession.configuration.urlCache?.currentDiskUsage ?? 0
-        return (memory: memoryUsed, disk: diskUsed)
-    }
-    
-    func preloadImages(urls: [URL]) {
-        guard settings.preloadEnabled else { return }
-        
-        Task {
-            for url in urls {
-                _ = await loadImage(from: url)
-            }
-        }
-    }
-}
-
-// MARK: - Cached AsyncImage
+// MARK: - Cached AsyncImage with Kingfisher (Disk-Only)
 
 struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     private let url: URL?
     private let content: (Image) -> Content
     private let placeholder: () -> Placeholder
-    
-    @StateObject private var imageManager = ImageCacheManager.shared
-    @State private var loadedImage: UIImage?
-    @State private var isLoading = false
     
     init(
         url: URL?,
@@ -151,35 +19,74 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     }
     
     var body: some View {
+        // Use manual approach with KingFisher for better compatibility
+        AsyncImageLoader(url: url, content: content, placeholder: placeholder)
+    }
+}
+
+// MARK: - AsyncImageLoader using KingFisher
+
+private struct AsyncImageLoader<Content: View, Placeholder: View>: View {
+    let url: URL?
+    let content: (Image) -> Content
+    let placeholder: () -> Placeholder
+    
+    @State private var loadedImage: UIImage?
+    @State private var isLoading = false
+    
+    var body: some View {
         Group {
             if let loadedImage = loadedImage {
                 content(Image(uiImage: loadedImage))
             } else {
                 placeholder()
-                    .onAppear {
-                        Task {
-                            await loadImage()
-                        }
-                    }
             }
+        }
+        .onAppear {
+            loadImage()
         }
         .onChange(of: url) { _, newURL in
             loadedImage = nil
-            Task {
-                await loadImage()
-            }
+            loadImage()
         }
     }
     
-    private func loadImage() async {
+    private func loadImage() {
         guard let url = url, !isLoading else { return }
         
         isLoading = true
-        let image = await imageManager.loadImage(from: url)
         
-        await MainActor.run {
-            self.loadedImage = image
-            self.isLoading = false
+        // Use KingFisher with our optimized cache settings
+        let options: KingfisherOptionsInfo = [
+            .diskCacheExpiration(.days(30)),
+            .backgroundDecode,
+            .scaleFactor(UIScreen.main.scale),
+            .retryStrategy(DelayRetryStrategy(maxRetryCount: 1, retryInterval: .seconds(1)))
+        ]
+        
+        KingfisherManager.shared.retrieveImage(with: url, options: options) { result in
+            DispatchQueue.main.async {
+                self.isLoading = false
+                switch result {
+                case .success(let value):
+                    self.loadedImage = value.image
+                    // Log cache hit/miss
+                    if value.cacheType == .disk {
+                        Logger.general.debug("🖼️ Image loaded from disk cache: \(url)")
+                    } else {
+                        Logger.general.debug("📥 Image downloaded and cached: \(url)")
+                    }
+                case .failure(let error):
+                    // Handle decompression errors by clearing cache and potentially retrying
+                    if error.errorDescription?.contains("decompressing") == true || error.errorDescription?.contains("-17102") == true {
+                        Logger.general.warning("🗑️ Image decompression failed, clearing cache for: \(url)")
+                        KingfisherManager.shared.cache.removeImage(forKey: url.absoluteString)
+                    } else {
+                        Logger.general.error("❌ Failed to load image from \(url): \(error)")
+                    }
+                    self.loadedImage = nil
+                }
+            }
         }
     }
 }

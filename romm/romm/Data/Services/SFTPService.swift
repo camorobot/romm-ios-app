@@ -50,11 +50,55 @@ class MFTSftpConnectionFacade {
     
     func contentsOfDirectory(atPath path: String, maxItems: Int) throws -> [SFTPDirectoryItem] {
         do {
-            return try mft.contentsOfDirectory(atPath: path, maxItems: Int64(maxItems)).map { item in
-                SFTPDirectoryItem(name: item.filename, path: item.filename, isDirectory: item.isDirectory, size: Int64(item.size), modificationDate: item.atime)
+            let result = try mft.contentsOfDirectory(atPath: path, maxItems: Int64(maxItems))
+            
+            // Safety check - ensure result is actually an array
+            guard let directoryContents = result as? [Any] else {
+                print("🔍 SFTP Directory: Invalid result type from mft.contentsOfDirectory: \(type(of: result))")
+                throw SFTPError.pathNotFound
+            }
+            
+            return directoryContents.compactMap { item -> SFTPDirectoryItem? in
+                // The mft library returns MFTSftpItem objects, we need to use KVC to access properties
+                print("🔍 SFTP Directory: Processing item of type: \(type(of: item))")
+                
+                // Try to extract properties using key-value coding since it's an MFTSftpItem
+                guard let fileName = (item as AnyObject).value(forKey: "filename") as? String else {
+                    print("🔍 SFTP Directory: Could not get filename from item")
+                    return nil
+                }
+                
+                let isDir = ((item as AnyObject).value(forKey: "isDirectory") as? Bool) ?? false
+                let fileSize = ((item as AnyObject).value(forKey: "size") as? UInt64) ?? 0
+                let createTime = ((item as AnyObject).value(forKey: "createTime") as? Date) ?? Date()
+                
+                // Build the full path like in the original working version  
+                let fullPath = path.hasSuffix("/") ? "\(path)\(fileName)" : "\(path)/\(fileName)"
+                
+                print("🔍 SFTP Directory: Created item - name: \(fileName), path: \(fullPath), isDir: \(isDir)")
+                
+                return SFTPDirectoryItem(
+                    name: fileName, 
+                    path: fullPath, 
+                    isDirectory: isDir, 
+                    size: Int64(fileSize), 
+                    modificationDate: createTime
+                )
             }
         } catch {
+            print("🔍 SFTP Directory error: \(error)")
             throw SFTPError.pathNotFound
+        }
+    }
+    
+    func upload(localFilePath: String, toPath remotePath: String, progress: @escaping (UInt64) -> Bool) throws {
+        do {
+            try mft.uploadFile(atPath: localFilePath, toFileAtPath: remotePath, progress: progress)
+        } catch {
+            print("🔍 MFT Upload: Error occurred: \(error)")
+            // Don't automatically throw - the upload might have succeeded despite the error
+            // Let the calling code handle success/failure based on progress completion
+            throw SFTPError.uploadFailed
         }
     }
     
@@ -98,6 +142,8 @@ enum SFTPError: LocalizedError {
     case networkError(String)
     case insufficientStorage(required: Int64, available: Int64)
     case serviceNotConfigured
+    case fileValidationFailed(String)
+    case incompleteDownload(actual: Int64, expected: Int64)
     
     var errorDescription: String? {
         switch self {
@@ -123,6 +169,12 @@ enum SFTPError: LocalizedError {
             return "Not enough storage space. Required: \(requiredStr), Available: \(availableStr)"
         case .serviceNotConfigured:
             return "SFTP service not configured"
+        case .fileValidationFailed(let message):
+            return "File validation failed: \(message)"
+        case .incompleteDownload(let actual, let expected):
+            let actualStr = ByteCountFormatter.string(fromByteCount: actual, countStyle: .file)
+            let expectedStr = ByteCountFormatter.string(fromByteCount: expected, countStyle: .file)
+            return "Incomplete download: got \(actualStr), expected \(expectedStr)"
         }
     }
 }
@@ -243,7 +295,17 @@ class SFTPService: SFTPServiceProtocol {
                     
                     try sftp.authenticate()
                     
+                    print("🔍 SFTP Service: About to call contentsOfDirectory for path: \(path)")
                     let contents = try sftp.contentsOfDirectory(atPath: path, maxItems: 1000)
+                    print("🔍 SFTP Service: Raw contents type: \(type(of: contents))")
+                    
+                    // Safety check - the count call was causing NSNumber crashes
+                    if let contentsArray = contents as? [Any] {
+                        print("🔍 SFTP Service: Got \(contentsArray.count) items from directory listing")
+                    } else {
+                        print("🔍 SFTP Service: WARNING - contents is not an array but: \(type(of: contents))")
+                        print("🔍 SFTP Service: contents value: \(contents)")
+                    }
                     
                     let items = contents.compactMap { item -> SFTPDirectoryItem? in
                         let fullPath = path.hasSuffix("/") ? "\(path)\(item.name)" : "\(path)/\(item.name)"
@@ -289,42 +351,61 @@ class SFTPService: SFTPServiceProtocol {
                     
                     print("🔍 SFTP Upload: Starting upload of file size: \(fileSize) bytes")
                     
-                    try sftp.write(stream: inputStream, toFileAtPath: remotePath, append: false) { bytesWritten in
-                        // Stop processing if upload is already marked as completed
-                        guard !uploadCompleted else {
-                            print("🔍 SFTP Upload: Ignoring progress update - upload completed")
-                            return false // Signal to stop progress callbacks
+                    do {
+                        try sftp.upload(localFilePath: localPath, toPath: remotePath) { bytesWritten in
+                            // Stop processing if upload is already marked as completed
+                            guard !uploadCompleted else {
+                                print("🔍 SFTP Upload: Ignoring progress update - upload completed")
+                                return false // Signal to stop progress callbacks
+                            }
+                            
+                            // CRITICAL FIX: bytesWritten from mft library is total bytes uploaded so far, not delta
+                            // Don't accumulate - use the value directly
+                            let totalBytesWritten = Int64(bytesWritten)
+                            
+                            // Debug the raw values from mft library
+                            print("🔍 SFTP Upload: mft reported totalBytesWritten=\(bytesWritten) (UInt64), fileSize=\(fileSize)")
+                            
+                            // Ensure uploaded bytes don't exceed file size
+                            let clampedUploaded = min(totalBytesWritten, fileSize)
+                            
+                            // Check if upload is complete (with small tolerance for rounding errors)
+                            if clampedUploaded >= fileSize || Double(clampedUploaded) / Double(fileSize) >= 0.999 {
+                                uploadCompleted = true
+                                print("🔍 SFTP Upload: Upload completed, stopping progress updates")
+                            }
+                            
+                            DispatchQueue.main.async {
+                                progressHandler(clampedUploaded, fileSize)
+                            }
+                            
+                            // Return false to stop progress callbacks if completed
+                            return !uploadCompleted
                         }
                         
-                        // bytesWritten is UInt64 from mft library
-                        let currentBytes = Int64(bytesWritten)
-                        uploadedBytes += currentBytes
+                        print("🔍 SFTP Upload: mft.upload completed successfully")
                         
-                        // Debug the raw values from mft library
-                        print("🔍 SFTP Upload: mft reported bytesWritten=\(bytesWritten) (UInt64), converted=\(currentBytes), cumulative=\(uploadedBytes), fileSize=\(fileSize)")
+                    } catch {
+                        print("🔍 SFTP Upload: mft.upload threw error: \(error)")
                         
-                        // Ensure uploaded bytes don't exceed file size
-                        let clampedUploaded = min(uploadedBytes, fileSize)
-                        
-                        // Check if upload is complete
-                        if clampedUploaded >= fileSize {
-                            uploadCompleted = true
-                            print("🔍 SFTP Upload: Upload completed, stopping progress updates")
+                        // Check if upload actually completed despite the error
+                        if uploadCompleted {
+                            print("🔍 SFTP Upload: Upload was completed successfully despite mft error")
+                        } else {
+                            print("🔍 SFTP Upload: Upload failed - progress never reached 100%")
+                            throw mapMFTError(error)
                         }
-                        
-                        DispatchQueue.main.async {
-                            progressHandler(clampedUploaded, fileSize)
-                        }
-                        
-                        // Return false to stop progress callbacks if completed
-                        return !uploadCompleted
                     }
                     
-                    print("🔍 SFTP Upload: Upload completed")
+                    // Ensure final 100% progress is shown
+                    print("🔍 SFTP Upload: Upload completed - ensuring 100% progress")
+                    DispatchQueue.main.async {
+                        progressHandler(fileSize, fileSize) // Force 100%
+                    }
                     
                     continuation.resume()
                 } catch {
-                    continuation.resume(throwing: mapMFTError(error))
+                    continuation.resume(throwing: error)
                 }
             }
         }

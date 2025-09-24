@@ -139,13 +139,21 @@ class SFTPRepository: SFTPRepositoryProtocol {
     
     func addFavoriteDirectory(_ path: String, for connectionId: UUID) throws {
         logger.info("Adding favorite directory: \(path) for connection: \(connectionId)")
+        print("🔍 SFTP Repository: Adding favorite - path: \(path), connectionId: \(connectionId)")
         
         let favoritesKey = favoritesKeyPrefix + connectionId.uuidString
+        print("🔍 SFTP Repository: Favorites key: \(favoritesKey)")
+        
         var favorites = getFavoriteDirectories(for: connectionId)
+        print("🔍 SFTP Repository: Current favorites: \(favorites)")
         
         if !favorites.contains(path) {
             favorites.append(path)
+            print("🔍 SFTP Repository: New favorites list: \(favorites)")
             userDefaults.set(favorites, forKey: favoritesKey)
+            print("🔍 SFTP Repository: UserDefaults set successful")
+        } else {
+            print("🔍 SFTP Repository: Path already in favorites, skipping")
         }
     }
     

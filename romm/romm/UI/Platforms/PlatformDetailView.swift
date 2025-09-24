@@ -12,23 +12,38 @@ struct PlatformDetailView: View {
     
     let platform: Platform
     
-    @StateObject private var viewModel = PlatformDetailViewModel()
+    @State private var viewModel = PlatformDetailViewModel()
     
-    @State private var viewMode: ViewMode = ViewMode(rawValue: UserDefaults.standard.string(forKey: "selectedViewMode") ?? ViewMode.smallCard.rawValue) ?? .smallCard
     @State private var searchText = ""
+    @State private var showingSortSheet = false
+    
+    // Filter state
+    @State private var selectedLanguages: Set<String> = []
+    @State private var selectedRegions: Set<String> = []
+    @State private var selectedStatus: Set<String> = []
+    @State private var releaseYearRange: ClosedRange<Int>? = nil
+    
+    // Check if custom sorting is active (not default name/asc)
+    private var isCustomSortingActive: Bool {
+        viewModel.currentOrderBy != "name" || viewModel.currentOrderDir != "asc"
+    }
+    
+    // Check if any filters are active
+    private var isFilterActive: Bool {
+        !selectedLanguages.isEmpty || !selectedRegions.isEmpty || !selectedStatus.isEmpty || releaseYearRange != nil
+    }
     
     var body: some View {
         VStack(spacing: 0) {
             // Content
             switch viewModel.viewState {
             case .loading:
-                LoadingView(message: "Loading ROMs...")
-                
-            case .loaded(let roms), .loadingMore(let roms):
-                ZStack {
+                // Only show full loading screen if we have no ROMs at all
+                if viewModel.hasLoadedRoms {
+                    // Show content while refreshing in background
                     RomListWithSectionIndex(
-                        roms: filteredRoms(from: roms),
-                        viewMode: viewMode,
+                        roms: filteredRoms(from: viewModel.lastLoadedRoms),
+                        viewMode: viewModel.viewMode,
                         onRefresh: {
                             await viewModel.refreshRoms()
                         },
@@ -48,31 +63,39 @@ struct PlatformDetailView: View {
                         canLoadMore: viewModel.canLoadMore,
                         platform: platform
                     )
-                    
-                    // Show loading indicator at bottom when loading more
-                    if case .loadingMore = viewModel.viewState {
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                    .padding(12)
-                                    .background(Color(.systemBackground).opacity(0.9))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .shadow(radius: 2)
-                                Spacer()
-                            }
-                            .padding(.bottom, 50)
-                        }
-                    }
+                } else {
+                    LoadingView("Loading ROMs...")
                 }
+                
+            case .loaded(let roms), .loadingMore(let roms):
+                RomListWithSectionIndex(
+                    roms: filteredRoms(from: roms),
+                    viewMode: viewModel.viewMode,
+                    onRefresh: {
+                        await viewModel.refreshRoms()
+                    },
+                    onLoadMore: {
+                        await viewModel.loadMoreRomsIfNeeded()
+                    },
+                    charIndex: viewModel.charIndex,
+                    selectedChar: viewModel.selectedChar,
+                    onCharTapped: { char in
+                        await viewModel.filterByChar(char, platformId: platform.id)
+                    },
+                    onSort: { orderBy, orderDir in
+                        await viewModel.sortRoms(orderBy: orderBy, orderDir: orderDir)
+                    },
+                    currentOrderBy: viewModel.currentOrderBy,
+                    currentOrderDir: viewModel.currentOrderDir,
+                    canLoadMore: viewModel.canLoadMore,
+                    platform: platform
+                )
                 
             case .empty(let message):
                 EmptyRomsView(message: message)
                 
             case .error(let errorMessage):
-                ErrorView(message: errorMessage) {
+                PlatformErrorView(message: errorMessage) {
                     Task {
                         await viewModel.loadRoms(for: platform.id)
                     }
@@ -81,48 +104,177 @@ struct PlatformDetailView: View {
         }
         .navigationTitle(platform.name)
         .navigationBarTitleDisplayMode(.large)
-        .searchable(text: $searchText, prompt: "Search ROMs...")
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 // Sort/Filter Button
                 Button(action: {
-                    // Placeholder für Sort/Filter action
+                    showingSortSheet = true
                 }) {
-                    Image(systemName: "line.3.horizontal.decrease")
-                        .font(.system(size: 16, weight: .medium))
+                    ZStack {
+                        Image(systemName: "line.3.horizontal.decrease")
+                            .font(.system(size: 16, weight: .medium))
+                        
+                        // Active sorting/filtering indicator
+                        if isCustomSortingActive || isFilterActive {
+                            Circle()
+                                .fill(Color.blue)
+                                .frame(width: 6, height: 6)
+                                .offset(x: 8, y: -8)
+                        }
+                    }
                 }
                 
                 // View Mode Toggle Button
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        switch viewMode {
+                        let newMode: ViewMode
+                        switch viewModel.viewMode {
                         case .smallCard:
-                            viewMode = .bigCard
+                            newMode = .bigCard
                         case .bigCard:
-                            viewMode = .table
+                            newMode = .table
                         case .table:
-                            viewMode = .smallCard
+                            newMode = .smallCard
                         }
-                        UserDefaults.standard.set(viewMode.rawValue, forKey: "selectedViewMode")
+                        viewModel.updateViewMode(newMode)
                     }
                 }) {
-                    Image(systemName: viewMode.icon)
+                    Image(systemName: viewModel.viewMode.icon)
                         .font(.system(size: 16, weight: .medium))
                 }
             }
         }
-        .task {
-            await viewModel.loadRoms(for: platform.id)
+        .toolbar(.hidden, for: .tabBar)
+        .sheet(isPresented: $showingSortSheet) {
+            let currentRoms = getCurrentRoms()
+            let filterOptions = getAvailableFilterOptions(from: currentRoms)
+            
+            SortOptionsSheet(
+                currentOrderBy: viewModel.currentOrderBy,
+                currentOrderDir: viewModel.currentOrderDir,
+                filterOptions: filterOptions,
+                selectedLanguages: $selectedLanguages,
+                selectedRegions: $selectedRegions,
+                selectedStatus: $selectedStatus,
+                releaseYearRange: $releaseYearRange,
+                onSortSelected: { orderBy, orderDir in
+                    
+                    Task {
+                        await viewModel.sortRoms(orderBy: orderBy, orderDir: orderDir)
+                    }
+                    showingSortSheet = false
+                },
+                onResetFilters: {
+                    selectedLanguages.removeAll()
+                    selectedRegions.removeAll()
+                    selectedStatus.removeAll()
+                    releaseYearRange = nil
+                }
+            )
+        }
+        .onAppear {
+            // Only load if we don't have data for this platform yet
+            if !viewModel.hasDataFor(platformId: platform.id) {
+                Task {
+                    await viewModel.loadRoms(for: platform.id)
+                }
+            }
         }
     }
     
     private func filteredRoms(from roms: [Rom]) -> [Rom] {
-        if searchText.isEmpty {
-            return roms
-        } else {
-            return roms.filter { rom in
+        var filtered = roms
+        
+        // Apply search text filter
+        if !searchText.isEmpty {
+            filtered = filtered.filter { rom in
                 rom.name.localizedCaseInsensitiveContains(searchText)
             }
+        }
+        
+        // Apply language filter
+        if !selectedLanguages.isEmpty {
+            filtered = filtered.filter { rom in
+                !rom.languages.isEmpty && Set(rom.languages).intersection(selectedLanguages).count > 0
+            }
+        }
+        
+        // Apply region filter
+        if !selectedRegions.isEmpty {
+            filtered = filtered.filter { rom in
+                !rom.regions.isEmpty && Set(rom.regions).intersection(selectedRegions).count > 0
+            }
+        }
+        
+        // Apply status filter
+        if !selectedStatus.isEmpty {
+            filtered = filtered.filter { rom in
+                let statusSet = getStatusSet(for: rom)
+                return statusSet.intersection(selectedStatus).count > 0
+            }
+        }
+        
+        // Apply release year filter
+        if let yearRange = releaseYearRange {
+            filtered = filtered.filter { rom in
+                guard let year = rom.releaseYear else { return false }
+                return yearRange.contains(year)
+            }
+        }
+        
+        return filtered
+    }
+    
+    private func getStatusSet(for rom: Rom) -> Set<String> {
+        var statuses: Set<String> = []
+        
+        if rom.isFavourite {
+            statuses.insert("Favourite")
+        }
+        if rom.hasRetroAchievements {
+            statuses.insert("RetroAchievements")
+        }
+        if rom.isPlayable {
+            statuses.insert("Playable")
+        } else {
+            statuses.insert("Not Playable")
+        }
+        
+        return statuses
+    }
+    
+    private func getAvailableFilterOptions(from roms: [Rom]) -> FilterOptions {
+        var languages: Set<String> = []
+        var regions: Set<String> = []
+        var statuses: Set<String> = []
+        var years: Set<Int> = []
+        
+        for rom in roms {
+            languages.formUnion(rom.languages)
+            regions.formUnion(rom.regions)
+            statuses.formUnion(getStatusSet(for: rom))
+            
+            if let year = rom.releaseYear {
+                years.insert(year)
+            }
+        }
+        
+        return FilterOptions(
+            languages: Array(languages).sorted(),
+            regions: Array(regions).sorted(),
+            statuses: Array(statuses).sorted(),
+            releaseYears: Array(years).sorted()
+        )
+    }
+    
+    private func getCurrentRoms() -> [Rom] {
+        switch viewModel.viewState {
+        case .loaded(let roms), .loadingMore(let roms):
+            return roms
+        case .loading:
+            return viewModel.lastLoadedRoms
+        default:
+            return []
         }
     }
 }
@@ -163,7 +315,6 @@ struct PlatformHeaderView: View {
                     case .table:
                         viewMode = .smallCard
                     }
-                    UserDefaults.standard.set(viewMode.rawValue, forKey: "selectedViewMode")
                 }
             }) {
                 HStack(spacing: 6) {
@@ -191,151 +342,78 @@ struct SmallRomCardView: View {
     let rom: Rom
     
     var body: some View {
-        HStack {
+        HStack(spacing: 12) {
+            // ROM Cover Image
             CachedAsyncImage(urlString: rom.urlCover) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } placeholder: {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.gray.opacity(0.2))
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(LinearGradient(
+                        colors: [Color.gray.opacity(0.15), Color.gray.opacity(0.25)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
                     .overlay(
                         Image(systemName: "gamecontroller")
                             .foregroundColor(.gray)
+                            .font(.title2)
                     )
             }
-            .frame(width: 50, height: 50)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
             
-            VStack(alignment: .leading, spacing: 2) {
+            // ROM Information
+            VStack(alignment: .leading, spacing: 4) {
                 Text(rom.name)
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
                 
-                if let year = rom.releaseYear {
-                    Text("\(year)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                HStack(spacing: 8) {
+                    if let year = rom.releaseYear {
+                        HStack(spacing: 3) {
+                            Image(systemName: "calendar")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text("\(year)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    if let rating = rom.rating {
+                        HStack(spacing: 3) {
+                            Image(systemName: "star.fill")
+                                .font(.caption2)
+                                .foregroundColor(.yellow)
+                            Text(String(format: "%.1f", rating))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
             }
             
             Spacer()
             
-            RomStatusIcons(rom: rom)
-        }
-        .padding(12)
-        .background(Color(.systemBackground))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(.separator), lineWidth: 0.5)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-}
-
-struct BigRomCardView: View {
-    let rom: Rom
-    let platform: Platform?
-    
-    init(rom: Rom, platform: Platform? = nil) {
-        self.rom = rom
-        self.platform = platform
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ZStack(alignment: .topTrailing) {
-                CachedAsyncImage(urlString: rom.urlCover) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.gray.opacity(0.15))
-                        .overlay(
-                            Image(systemName: "gamecontroller")
-                                .foregroundColor(.gray)
-                                .font(.title2)
-                        )
-                }
-                .frame(height: 160)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                
-                // Favorite icon (readonly) - top right
-                if rom.isFavourite {
-                    Image(systemName: "heart.fill")
-                        .font(.title3)
-                        .foregroundColor(.red)
-                        .padding(8)
-                        .background(Color.white.opacity(0.9))
-                        .clipShape(Circle())
-                        .offset(x: -8, y: 8)
-                }
+            // Status Icons
+            VStack(spacing: 4) {
+                RomStatusIcons(rom: rom)
             }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text(rom.name)
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .foregroundColor(.primary)
-                
-                HStack(alignment: .center, spacing: 8) {
-                    if let year = rom.releaseYear {
-                        HStack(spacing: 4) {
-                            Image(systemName: "calendar")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("\(year)")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    if let rating = rom.rating {
-                        HStack(spacing: 4) {
-                            Image(systemName: "star.fill")
-                                .font(.caption)
-                                .foregroundColor(.yellow)
-                            Text(String(format: "%.1f", rating))
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                
-                HStack {
-                    // Platform icon - bottom left
-                    if let platform = platform {
-                        Image(platform.slug)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 24, height: 24)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                    }
-                    
-                    Spacer()
-                    RomStatusIcons(rom: rom)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 4)
         }
-        .padding(16)
+        .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(.separator).opacity(0.2), lineWidth: 0.5)
         )
     }
 }
@@ -447,8 +525,352 @@ struct PlatformErrorView: View {
     }
 }
 
+// MARK: - Filter Options Data Structure
+struct FilterOptions {
+    let languages: [String]
+    let regions: [String]
+    let statuses: [String]
+    let releaseYears: [Int]
+}
+
+// MARK: - Sort Options Sheet
+struct SortOptionsSheet: View {
+    let currentOrderBy: String
+    let currentOrderDir: String
+    let filterOptions: FilterOptions
+    @Binding var selectedLanguages: Set<String>
+    @Binding var selectedRegions: Set<String>
+    @Binding var selectedStatus: Set<String>
+    @Binding var releaseYearRange: ClosedRange<Int>?
+    let onSortSelected: (String, String) -> Void
+    let onResetFilters: () -> Void
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    private var isResetAvailable: Bool {
+        currentOrderBy != "name" || currentOrderDir != "asc"
+    }
+    
+    private var isFiltersActive: Bool {
+        !selectedLanguages.isEmpty || !selectedRegions.isEmpty || !selectedStatus.isEmpty || releaseYearRange != nil
+    }
+    
+    private let sortOptions: [(field: SortField, displayName: String)] = [
+        (.name, "Title"),
+        (.size, "Size"),
+        (.added, "Added"),
+        (.released, "Released"),
+        (.rating, "Rating")
+    ]
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                List {
+                    Section("Sort Options") {
+                        ForEach(sortOptions, id: \.field.rawValue) { option in
+                            SortOptionRow(
+                                title: option.displayName,
+                                field: option.field,
+                                currentOrderBy: currentOrderBy,
+                                currentOrderDir: currentOrderDir,
+                                onSelected: onSortSelected
+                            )
+                        }
+                    }
+                    
+                    Section("Filter Options") {
+                        // Language Filter
+                        if !filterOptions.languages.isEmpty {
+                            FilterRow(
+                                title: "Language",
+                                options: filterOptions.languages,
+                                selectedOptions: $selectedLanguages,
+                                icon: "globe"
+                            )
+                        }
+                        
+                        // Region Filter
+                        if !filterOptions.regions.isEmpty {
+                            FilterRow(
+                                title: "Region",
+                                options: filterOptions.regions,
+                                selectedOptions: $selectedRegions,
+                                icon: "flag"
+                            )
+                        }
+                        
+                        // Status Filter
+                        if !filterOptions.statuses.isEmpty {
+                            FilterRow(
+                                title: "Status",
+                                options: filterOptions.statuses,
+                                selectedOptions: $selectedStatus,
+                                icon: "star"
+                            )
+                        }
+                        
+                        // Release Year Filter
+                        if !filterOptions.releaseYears.isEmpty {
+                            ReleaseYearFilterRow(
+                                availableYears: filterOptions.releaseYears,
+                                selectedRange: $releaseYearRange
+                            )
+                        }
+                    }
+                }
+                
+                // Bottom button section
+                VStack(spacing: 12) {
+                    Divider()
+                    
+                    HStack(spacing: 16) {
+                        // Reset button
+                        Button("Reset to Default") {
+                            onSortSelected("name", "asc")
+                            onResetFilters()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.bordered)
+                        .foregroundColor(.red)
+                        .disabled(!isResetAvailable && !isFiltersActive)
+                        
+                        // Done button
+                        Button("Done") {
+                            dismiss()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+                .padding(.top, 8)
+                .background(Color(.systemBackground))
+            }
+            .navigationTitle("Sort & Filter")
+            .navigationBarTitleDisplayMode(.large)
+        }
+    }
+}
+
+struct SortOptionRow: View {
+    let title: String
+    let field: SortField
+    let currentOrderBy: String
+    let currentOrderDir: String
+    let onSelected: (String, String) -> Void
+    
+    private var isSelected: Bool {
+        field.rawValue == currentOrderBy
+    }
+    
+    private var currentDirection: SortDirection {
+        SortDirection(rawValue: currentOrderDir) ?? .asc
+    }
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.body)
+                    .fontWeight(isSelected ? .semibold : .regular)
+                
+                if isSelected {
+                    Text(currentDirection == .asc ? "Ascending" : "Descending")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            HStack(spacing: 12) {
+                // Ascending button
+                Button(action: {
+                    onSelected(field.rawValue, SortDirection.asc.rawValue)
+                }) {
+                    Image(systemName: "chevron.up")
+                        .foregroundColor(isSelected && currentDirection == .asc ? .blue : .secondary)
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                
+                // Descending button  
+                Button(action: {
+                    onSelected(field.rawValue, SortDirection.desc.rawValue)
+                }) {
+                    Image(systemName: "chevron.down")
+                        .foregroundColor(isSelected && currentDirection == .desc ? .blue : .secondary)
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            let newDirection = isSelected && currentDirection == .asc ? SortDirection.desc : SortDirection.asc
+            onSelected(field.rawValue, newDirection.rawValue)
+        }
+    }
+}
+
+// MARK: - Filter Row Component
+struct FilterRow: View {
+    let title: String
+    let options: [String]
+    @Binding var selectedOptions: Set<String>
+    let icon: String
+    
+    var body: some View {
+        NavigationLink {
+            FilterSelectionView(
+                title: title,
+                options: options,
+                selectedOptions: $selectedOptions
+            )
+        } label: {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(.blue)
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(width: 20)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.body)
+                    
+                    if !selectedOptions.isEmpty {
+                        Text("\(selectedOptions.count) selected")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("All")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                if !selectedOptions.isEmpty {
+                    Text("\(selectedOptions.count)")
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue)
+                        .clipShape(Capsule())
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Release Year Filter Row
+struct ReleaseYearFilterRow: View {
+    let availableYears: [Int]
+    @Binding var selectedRange: ClosedRange<Int>?
+    
+    private var minYear: Int {
+        availableYears.min() ?? 1980
+    }
+    
+    private var maxYear: Int {
+        availableYears.max() ?? Calendar.current.component(.year, from: Date())
+    }
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "calendar")
+                .foregroundColor(.blue)
+                .font(.system(size: 16, weight: .medium))
+                .frame(width: 20)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Release Year")
+                    .font(.body)
+                
+                if let range = selectedRange {
+                    Text("\(range.lowerBound) - \(range.upperBound)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("All years")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            Button(selectedRange == nil ? "Set Range" : "Clear") {
+                if selectedRange == nil {
+                    selectedRange = minYear...maxYear
+                } else {
+                    selectedRange = nil
+                }
+            }
+            .font(.caption)
+            .foregroundColor(.blue)
+        }
+    }
+}
+
+// MARK: - Filter Selection View
+struct FilterSelectionView: View {
+    let title: String
+    let options: [String]
+    @Binding var selectedOptions: Set<String>
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(options, id: \.self) { option in
+                    HStack {
+                        Text(option)
+                        Spacer()
+                        if selectedOptions.contains(option) {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if selectedOptions.contains(option) {
+                            selectedOptions.remove(option)
+                        } else {
+                            selectedOptions.insert(option)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+                
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Clear All") {
+                        selectedOptions.removeAll()
+                    }
+                    .foregroundColor(.red)
+                    .disabled(selectedOptions.isEmpty)
+                }
+            }
+        }
+    }
+}
+
 #Preview {
-    NavigationView {
+    NavigationStack {
         PlatformDetailView(platform: Platform(
             id: 1,
             name: "Nintendo Switch",

@@ -1,45 +1,53 @@
 import SwiftUI
 
 struct SFTPDevicesView: View {
-    @State private var viewModel = SFTPDevicesViewModel()
+    @State private var viewModel: SFTPDevicesViewModel
+    
     
     init(dependencyFactory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
-        // With @Observable, we use simple initialization
+        self._viewModel = State(wrappedValue: .init(getAllConnectionsUseCase: dependencyFactory.makeGetAllConnectionsUseCase(), saveConnectionUseCase: dependencyFactory.makeSaveConnectionUseCase(), deleteConnectionUseCase: dependencyFactory.makeDeleteConnectionUseCase(), manageDefaultConnectionUseCase: dependencyFactory.makeManageDefaultConnectionUseCase(), testConnectionUseCase: dependencyFactory.makeTestConnectionUseCase(), checkConnectionStatusUseCase: dependencyFactory.makeCheckConnectionStatusUseCase(), clearConnectionCacheUseCase: dependencyFactory.makeClearConnectionCacheUseCase()))
     }
     
     var body: some View {
-        NavigationView {
-            VStack {
-                if viewModel.connections.isEmpty && !viewModel.isLoading {
-                    emptyStateView
-                } else {
-                    devicesList
-                }
+        VStack {
+            if viewModel.connections.isEmpty && !viewModel.isLoading {
+                emptyStateView
+            } else {
+                devicesList
             }
-            .navigationTitle("SFTP Devices")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add Device") {
-                        viewModel.addDevice()
-                    }
-                }
+        }
+        .navigationTitle("Devices")
+        .overlay(alignment: .bottomTrailing) {
+            Button(action: {
+                viewModel.addDevice()
+            }) {
+                Image(systemName: "plus")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(width: 56, height: 56)
+                    .background(Color.accentColor)
+                    .clipShape(Circle())
+                    .shadow(radius: 4)
             }
-            .refreshable {
-                await viewModel.refreshConnectionStatuses()
+            .padding(.trailing, 16)
+            .padding(.bottom, 16)
+        }
+        .refreshable {
+            await viewModel.refreshConnectionStatuses()
+        }
+        .sheet(isPresented: $viewModel.showingAddDevice) {
+            AddEditSFTPDeviceView(
+                connection: viewModel.editingConnection,
+                onSave: viewModel.saveConnection
+            )
+        }
+        .alert("Error", isPresented: .constant(viewModel.error != nil)) {
+            Button("OK") {
+                viewModel.error = nil
             }
-            .sheet(isPresented: $viewModel.showingAddDevice) {
-                AddEditSFTPDeviceView(
-                    connection: viewModel.editingConnection,
-                    onSave: viewModel.saveConnection
-                )
-            }
-            .alert("Error", isPresented: .constant(viewModel.error != nil)) {
-                Button("OK") {
-                    viewModel.error = nil
-                }
-            } message: {
-                Text(viewModel.error ?? "")
-            }
+        } message: {
+            Text(viewModel.error ?? "")
         }
         .task {
             await viewModel.refreshConnectionStatuses()

@@ -1,4 +1,5 @@
 import Foundation
+import Kingfisher
 
 class ImageCacheSettings: ObservableObject {
     static let shared = ImageCacheSettings()
@@ -6,10 +7,7 @@ class ImageCacheSettings: ObservableObject {
     private let userDefaults = UserDefaults.standard
     
     private init() {
-        // Initialize @Published properties from UserDefaults
-        let memoryValue = userDefaults.integer(forKey: Keys.memoryCacheLimit)
-        self.memoryCacheLimitMB = memoryValue > 0 ? memoryValue : Defaults.memoryCacheLimitMB
-        
+        // Initialize @Published properties from UserDefaults        
         let diskValue = userDefaults.integer(forKey: Keys.diskCacheLimit)
         self.diskCacheLimitMB = diskValue > 0 ? diskValue : Defaults.diskCacheLimitMB
         
@@ -22,7 +20,6 @@ class ImageCacheSettings: ObservableObject {
     
     // MARK: - Settings Keys
     private enum Keys {
-        static let memoryCacheLimit = "image_memory_cache_limit_mb"
         static let diskCacheLimit = "image_disk_cache_limit_mb"
         static let cacheEnabled = "image_cache_enabled"
         static let preloadEnabled = "image_preload_enabled"
@@ -31,7 +28,6 @@ class ImageCacheSettings: ObservableObject {
     
     // MARK: - Default Values
     private enum Defaults {
-        static let memoryCacheLimitMB = 100 // 100MB
         static let diskCacheLimitMB = 500   // 500MB
         static let cacheEnabled = true
         static let preloadEnabled = true
@@ -39,13 +35,6 @@ class ImageCacheSettings: ObservableObject {
     }
     
     // MARK: - Properties
-    
-    @Published var memoryCacheLimitMB: Int {
-        didSet {
-            userDefaults.set(memoryCacheLimitMB, forKey: Keys.memoryCacheLimit)
-            applySettings()
-        }
-    }
     
     @Published var diskCacheLimitMB: Int {
         didSet {
@@ -57,9 +46,7 @@ class ImageCacheSettings: ObservableObject {
     @Published var cacheEnabled: Bool {
         didSet {
             userDefaults.set(cacheEnabled, forKey: Keys.cacheEnabled)
-            if !cacheEnabled {
-                ImageCacheManager.shared.clearAllCaches()
-            }
+            // Don't clear caches aggressively - let user do it manually if needed
             applySettings()
         }
     }
@@ -79,10 +66,6 @@ class ImageCacheSettings: ObservableObject {
     
     // MARK: - Computed Properties
     
-    var memoryCacheLimitBytes: Int {
-        memoryCacheLimitMB * 1024 * 1024
-    }
-    
     var diskCacheLimitBytes: Int {
         diskCacheLimitMB * 1024 * 1024
     }
@@ -94,18 +77,16 @@ class ImageCacheSettings: ObservableObject {
     // MARK: - Methods
     
     func applySettings() {
-        ImageCacheManager.shared.updateSettings()
+        KingfisherCacheManager.shared.updateSettings()
     }
     
     func resetToDefaults() {
-        userDefaults.removeObject(forKey: Keys.memoryCacheLimit)
         userDefaults.removeObject(forKey: Keys.diskCacheLimit)
         userDefaults.removeObject(forKey: Keys.cacheEnabled)
         userDefaults.removeObject(forKey: Keys.preloadEnabled)
         userDefaults.removeObject(forKey: Keys.diskCacheExpiry)
         
         // Update @Published properties to trigger UI updates
-        memoryCacheLimitMB = Defaults.memoryCacheLimitMB
         diskCacheLimitMB = Defaults.diskCacheLimitMB
         cacheEnabled = Defaults.cacheEnabled
         preloadEnabled = Defaults.preloadEnabled
@@ -113,14 +94,14 @@ class ImageCacheSettings: ObservableObject {
     }
     
     func getCacheStatistics() -> CacheStatistics {
-        let (memoryUsed, diskUsed) = ImageCacheManager.shared.getCacheUsage()
+        let (memoryUsed, diskUsed) = KingfisherCacheManager.shared.getCacheUsage()
         
         return CacheStatistics(
-            memoryCacheUsedMB: memoryUsed / (1024 * 1024),
-            memoryCacheLimitMB: memoryCacheLimitMB,
+            memoryCacheUsedMB: 0, // Memory cache not user-visible
+            memoryCacheLimitMB: 100, // Fixed 100MB limit
             diskCacheUsedMB: diskUsed / (1024 * 1024),
             diskCacheLimitMB: diskCacheLimitMB,
-            memoryUtilization: Double(memoryUsed) / Double(memoryCacheLimitBytes),
+            memoryUtilization: 0, // Not measurable
             diskUtilization: Double(diskUsed) / Double(diskCacheLimitBytes)
         )
     }

@@ -7,52 +7,100 @@
 
 import Foundation
 import os
+import Observation
 
+enum CollectionViewState {
+    case loading
+    case empty
+    case loaded
+    case loadingMore
+}
+
+@Observable
 @MainActor
-class CollectionsViewModel: ObservableObject {
+class CollectionsViewModel {
     private let logger = Logger.viewModel
-    @Published var collections: [Collection] = []
-    @Published var virtualCollections: [VirtualCollection] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
+    var collections: [Collection] = []
+    var virtualCollections: [VirtualCollection] = []
+    var isLoading: Bool = false
+    var errorMessage: String?
+    var showingCreateCollection: Bool = false
+    var collectionToDelete: Collection?
+    var isDeleting: Bool = false
+    var canLoadMoreCollections: Bool = true
+    var isLoadingMore: Bool = false
+    
+    var viewState: CollectionViewState {
+        if isLoading {
+            return .loading
+        } else if collections.isEmpty && virtualCollections.isEmpty {
+            return .empty
+        } else if isLoadingMore {
+            return .loadingMore
+        } else {
+            return .loaded
+        }
+    }
     
     private let getCollectionsUseCase: GetCollectionsUseCase
     private let getVirtualCollectionsUseCase: GetVirtualCollectionsUseCase
+    private let deleteCollectionUseCase: DeleteCollectionUseCase
+    
+    // Pagination state
+    private var currentCollectionOffset = 0
+    private let collectionsPageSize = 20
+    
+    // Task management to prevent cancellations
     
     init(factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
         self.getCollectionsUseCase = factory.makeGetCollectionsUseCase()
         self.getVirtualCollectionsUseCase = factory.makeGetVirtualCollectionsUseCase()
+        self.deleteCollectionUseCase = factory.makeDeleteCollectionUseCase()
         
         // Load collections automatically on init
         loadCollections()
     }
     
     private func loadCollections() {
+        // Cancel any existing loading task
+        resetPagination()
+        
         isLoading = true
         errorMessage = nil
         
         Task {
             do {
-                // Load both regular collections and virtual collections in parallel
-                async let collectionsTask = getCollectionsUseCase.execute()
-                async let virtualCollectionsTask = getVirtualCollectionsUseCase.execute(type: "all", limit: 10)
+                // Load collections first with pagination, then virtual collections sequentially to avoid conflicts
+                logger.info("Loading initial collections...")
+                let loadedCollections = try await getCollectionsUseCase.execute(
+                    limit: collectionsPageSize,
+                    offset: 0
+                )
                 
-                let (loadedCollections, loadedVirtualCollections) = try await (collectionsTask, virtualCollectionsTask)
+                // Check if cancelled before continuing
+                try Task.checkCancellation()
                 
-                await MainActor.run {
-                    self.collections = loadedCollections
-                    self.virtualCollections = loadedVirtualCollections
-                    self.isLoading = false
-                }
+                logger.info("Loading virtual collections...")
+                let loadedVirtualCollections = try await getVirtualCollectionsUseCase.execute(type: "all", limit: 10)
                 
-                logger.info("Loaded \(loadedCollections.count) collections and \(loadedVirtualCollections.count) virtual collections")
+                // Check if cancelled before updating UI
+                try Task.checkCancellation()
                 
+                self.collections = loadedCollections
+                self.virtualCollections = loadedVirtualCollections
+                self.currentCollectionOffset = 0
+                self.canLoadMoreCollections = loadedCollections.count == self.collectionsPageSize
+                self.isLoading = false
+                
+                logger.info("✅ Loaded \(loadedCollections.count) collections and \(loadedVirtualCollections.count) virtual collections")
+                
+            } catch is CancellationError {
+                logger.info("Collection loading cancelled")
+                // Don't update UI on cancellation
             } catch {
-                await MainActor.run {
-                    self.isLoading = false
-                    self.errorMessage = error.localizedDescription
-                }
-                logger.error("Error loading collections: \(error)")
+                self.isLoading = false
+                self.errorMessage = error.localizedDescription
+                logger.error("❌ Error loading collections: \(error)")
             }
         }
     }
@@ -60,30 +108,135 @@ class CollectionsViewModel: ObservableObject {
     func refreshCollections() async {
         guard !isLoading else { return }
         
+        // Cancel any existing loading task and start fresh
+        resetPagination()
+        
         isLoading = true
         errorMessage = nil
         
         do {
-            // Load both regular collections and virtual collections in parallel
-            async let collectionsTask = getCollectionsUseCase.execute()
-            async let virtualCollectionsTask = getVirtualCollectionsUseCase.execute(type: "all", limit: 10)
+            // Load collections sequentially to avoid conflicts
+            logger.info("Refreshing collections...")
+            let loadedCollections = try await getCollectionsUseCase.execute(
+                limit: collectionsPageSize,
+                offset: 0
+            )
             
-            let (loadedCollections, loadedVirtualCollections) = try await (collectionsTask, virtualCollectionsTask)
+            logger.info("Refreshing virtual collections...")
+            let loadedVirtualCollections = try await getVirtualCollectionsUseCase.execute(type: "all", limit: 10)
             
-            collections = loadedCollections
-            virtualCollections = loadedVirtualCollections
-            isLoading = false
+            self.collections = loadedCollections
+            self.virtualCollections = loadedVirtualCollections
+            self.currentCollectionOffset = 0
+            self.canLoadMoreCollections = loadedCollections.count == self.collectionsPageSize
+            self.isLoading = false
             
-            logger.info("Refreshed \(collections.count) collections and \(virtualCollections.count) virtual collections")
+            logger.info("✅ Refreshed \(loadedCollections.count) collections and \(loadedVirtualCollections.count) virtual collections")
             
         } catch {
-            isLoading = false
-            errorMessage = error.localizedDescription
-            logger.error("Error refreshing collections: \(error)")
+            self.isLoading = false
+            self.errorMessage = error.localizedDescription
+            logger.error("❌ Error refreshing collections: \(error)")
         }
     }
     
     func clearError() {
         errorMessage = nil
+    }
+    
+    // MARK: - Collection Creation
+    
+    func showCreateCollection() {
+        showingCreateCollection = true
+    }
+    
+    func hideCreateCollection() {
+        showingCreateCollection = false
+    }
+    
+    func onCollectionCreated(_ collection: Collection) {
+        // Add the new collection to the list immediately for better UX
+        collections.insert(collection, at: 0)
+        logger.info("✅ New collection added to list: \(collection.name)")
+        
+        // Note: We don't refresh here to avoid overwriting the newly added item
+        // The list will be refreshed on the next app launch or manual refresh
+    }
+    
+    // MARK: - Collection Deletion
+    
+    func showDeleteConfirmation(for collection: Collection) {
+        collectionToDelete = collection
+    }
+    
+    func hideDeleteConfirmation() {
+        collectionToDelete = nil
+    }
+    
+    func deleteCollection(_ collection: Collection) async {
+        guard !isDeleting else { return }
+        
+        isDeleting = true
+        errorMessage = nil
+        
+        do {
+            try await deleteCollectionUseCase.execute(collectionId: collection.id)
+            
+            // Remove from local list immediately
+            collections.removeAll { $0.id == collection.id }
+            hideDeleteConfirmation()
+            
+            logger.info("✅ Collection deleted: \(collection.name)")
+            
+        } catch {
+            errorMessage = error.localizedDescription
+            logger.error("❌ Error deleting collection: \(error)")
+        }
+        
+        isDeleting = false
+    }
+    
+    // MARK: - Pagination
+    
+    func loadMoreCollectionsIfNeeded() async {
+        guard canLoadMoreCollections && !isLoadingMore && !isLoading else { 
+            logger.info("Skipping loadMore: canLoad=\(canLoadMoreCollections), isLoadingMore=\(isLoadingMore), isLoading=\(isLoading)")
+            return 
+        }
+        
+        isLoadingMore = true
+        
+        do {
+            logger.info("Loading more collections from offset \(currentCollectionOffset + collectionsPageSize)...")
+            
+            // Load more collections with pagination
+            let moreCollections = try await getCollectionsUseCase.execute(
+                limit: collectionsPageSize,
+                offset: currentCollectionOffset + collectionsPageSize
+            )
+            
+            if moreCollections.isEmpty {
+                canLoadMoreCollections = false
+                logger.info("No more collections to load")
+            } else {
+                // Append new collections to existing ones
+                collections.append(contentsOf: moreCollections)
+                currentCollectionOffset += collectionsPageSize
+                
+                logger.info("✅ Loaded \(moreCollections.count) more collections. Total: \(collections.count)")
+            }
+            
+        } catch {
+            logger.error("❌ Error loading more collections: \(error)")
+            errorMessage = error.localizedDescription
+        }
+        
+        isLoadingMore = false
+    }
+    
+    private func resetPagination() {
+        currentCollectionOffset = 0
+        canLoadMoreCollections = true
+        isLoadingMore = false
     }
 }

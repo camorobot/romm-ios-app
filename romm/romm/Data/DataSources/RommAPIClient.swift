@@ -22,6 +22,23 @@ protocol RommAPIClientProtocol {
     func getRomManual(romId: Int) async throws -> Manual?
     func getManualPDFData(manualURL: String) async throws -> Data
     func getRomDetails(id: Int) async throws -> DetailedRomSchema
+    
+    // ROM Search API Wrapper methods
+    func searchRomsWithOpenAPI(query: String) async throws -> CustomLimitOffsetPageSimpleRomSchema
+    
+    // Collections API Wrapper methods
+    func getCollections(limit: Int?, offset: Int?) async throws -> [CollectionSchema]
+    func getCollection(id: Int) async throws -> CollectionSchema
+    func getVirtualCollections(type: String, limit: Int?) async throws -> [VirtualCollectionSchema]
+    func getVirtualCollection(id: String) async throws -> VirtualCollectionSchema
+    func createCollection(name: String, description: String, isPublic: Bool, artwork: URL?) async throws -> CollectionSchema
+    func updateCollection(id: Int, name: String, description: String, isPublic: Bool, romIds: [Int]?, artwork: URL?) async throws -> CollectionSchema
+    func deleteCollection(id: Int) async throws -> String
+    
+    // Platforms API Wrapper methods
+    func getPlatforms() async throws -> [PlatformSchema]
+    func addPlatform(name: String, slug: String) async throws -> PlatformSchema
+    func deletePlatform(id: Int) async throws -> String
 }
 
 enum APIClientError: LocalizedError {
@@ -71,6 +88,25 @@ class RommAPIClient: RommAPIClientProtocol {
         // Update base URL from token provider when available
         if let baseURL = tokenProvider.getServerURL() {
             rommAPI.basePath = baseURL
+        }
+        
+        // Setup authentication for OpenAPI generated clients
+        if let username = tokenProvider.getUsername(),
+           let password = tokenProvider.getPassword() {
+            
+            // Create Basic Auth header
+            let loginString = "\(username):\(password)"
+            if let loginData = loginString.data(using: .utf8) {
+                let base64LoginString = loginData.base64EncodedString()
+                
+                // Set authentication headers for OpenAPI clients
+                rommAPI.customHeaders["Authorization"] = "Basic \(base64LoginString)"
+                
+                
+                logger.debug("✅ OpenAPI authentication configured for user: \(username)")
+            }
+        } else {
+            logger.warning("⚠️ No authentication credentials available for OpenAPI clients")
         }
     }
     
@@ -284,6 +320,18 @@ extension RommAPIClient {
         return try await RomsAPI.getRomApiRomsIdGet(id: id)
     }
     
+    func searchRomsWithOpenAPI(query: String) async throws -> CustomLimitOffsetPageSimpleRomSchema {
+        setupAPIConfiguration()
+        logger.info("🔍 OpenAPI Search: Searching for '\(query)'")
+        let result = try await RomsAPI.getRomsApiRomsGet(
+            searchTerm: query,
+            limit: 50,
+            offset: 0
+        )
+        logger.info("🔍 OpenAPI Search: Found \(result.items.count) ROMs out of \(result.total ?? 0) total")
+        return result
+    }
+    
     func updateRomFavorite(
         id: Int,
         isFavorite: Bool
@@ -403,9 +451,222 @@ extension RommAPIClient {
     }
 }
 
+// MARK: - Collections API Wrapper
+extension RommAPIClient {
+    func getCollections(limit: Int? = nil, offset: Int? = nil) async throws -> [CollectionSchema] {
+        setupAPIConfiguration()
+        return try await CollectionsAPI.getCollectionsApiCollectionsGet()
+    }
+    
+    func getCollection(id: Int) async throws -> CollectionSchema {
+        setupAPIConfiguration()
+        return try await CollectionsAPI.getCollectionApiCollectionsIdGet(id: id)
+    }
+    
+    func getVirtualCollections(type: String, limit: Int? = nil) async throws -> [VirtualCollectionSchema] {
+        setupAPIConfiguration()
+        return try await CollectionsAPI.getVirtualCollectionsApiCollectionsVirtualGet(type: type, limit: limit)
+    }
+    
+    func getVirtualCollection(id: String) async throws -> VirtualCollectionSchema {
+        setupAPIConfiguration()
+        return try await CollectionsAPI.getVirtualCollectionApiCollectionsVirtualIdGet(id: id)
+    }
+    
+    func createCollection(artwork: URL? = nil) async throws -> CollectionSchema {
+        setupAPIConfiguration()
+        return try await CollectionsAPI.addCollectionApiCollectionsPost(artwork: artwork)
+    }
+    
+    func createCollection(
+        name: String,
+        description: String,
+        isPublic: Bool,
+        artwork: URL? = nil
+    ) async throws -> CollectionSchema {
+        logger.info("🚀 Creating collection - name: '\(name)', description: '\(description)', isPublic: \(isPublic)")
+        
+        return try await createOrUpdateCollection(
+            method: "POST",
+            path: "api/collections",
+            name: name,
+            description: description,
+            romIds: nil, // New collections start empty
+            artwork: artwork
+        )
+    }
+    
+    func updateCollection(
+        id: Int,
+        name: String,
+        description: String,
+        isPublic: Bool,
+        romIds: [Int]? = nil,
+        artwork: URL? = nil
+    ) async throws -> CollectionSchema {
+        logger.info("🔄 Updating collection \(id) - name: '\(name)', description: '\(description)', romIds: \(romIds?.count ?? 0)")
+        
+        // Use the same multipart implementation as createCollection, but with PUT method
+        return try await createOrUpdateCollection(
+            method: "PUT",
+            path: "api/collections/\(id)?is_public=\(isPublic)&remove_cover=false",
+            name: name,
+            description: description,
+            romIds: romIds,
+            artwork: artwork
+        )
+    }
+    
+    func deleteCollection(id: Int) async throws -> String {
+        setupAPIConfiguration()
+        return try await CollectionsAPI.deleteCollectionApiCollectionsIdDelete(id: id)
+    }
+    
+    // MARK: - Private Helper for Collection Operations
+    
+    private func createOrUpdateCollection(
+        method: String,
+        path: String,
+        name: String,
+        description: String,
+        romIds: [Int]? = nil,
+        artwork: URL? = nil
+    ) async throws -> CollectionSchema {
+        // Get server configuration manually
+        guard let serverURL = tokenProvider.getServerURL()?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            logger.error("Missing server configuration")
+            throw APIClientError.noConfiguration
+        }
+        
+        // Get username and password for Basic Auth (Collection API needs real Basic Auth, not JWT)
+        guard let username = tokenProvider.getUsername(),
+              let password = tokenProvider.getPassword() else {
+            logger.error("Missing username or password for Basic Auth")
+            throw APIClientError.noCredentials
+        }
+        
+        // Create Basic Auth token: admin:password -> Base64
+        let loginString = "\(username):\(password)"
+        guard let loginData = loginString.data(using: .utf8) else {
+            logger.error("Failed to encode credentials")
+            throw APIClientError.noCredentials
+        }
+        let basicAuthToken = loginData.base64EncodedString()
+        
+        // Create full URL manually
+        let cleanServerURL = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let fullURL = "\(cleanServerURL)/\(path)"
+        
+        guard let url = URL(string: fullURL) else {
+            logger.error("Invalid URL: \(fullURL)")
+            throw APIClientError.invalidURL(fullURL)
+        }
+        
+        // Create multipart form data exactly like Safari browser
+        let boundaryId = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        let boundary = "WebKitFormBoundary\(boundaryId)"
+        var formData = Data()
+        
+        // Add name field
+        formData.append("------\(boundary)\r\n".data(using: .utf8)!)
+        formData.append("Content-Disposition: form-data; name=\"name\"\r\n\r\n".data(using: .utf8)!)
+        formData.append("\(name)\r\n".data(using: .utf8)!)
+        
+        // Add description field (can be empty)
+        formData.append("------\(boundary)\r\n".data(using: .utf8)!)
+        formData.append("Content-Disposition: form-data; name=\"description\"\r\n\r\n".data(using: .utf8)!)
+        if !description.isEmpty {
+            formData.append("\(description)\r\n".data(using: .utf8)!)
+        } else {
+            formData.append("\r\n".data(using: .utf8)!)
+        }
+        
+        // Add url_cover field (empty for now)
+        formData.append("------\(boundary)\r\n".data(using: .utf8)!)
+        formData.append("Content-Disposition: form-data; name=\"url_cover\"\r\n\r\n".data(using: .utf8)!)
+        formData.append("\r\n".data(using: .utf8)!)
+        
+        // Add rom_ids field
+        formData.append("------\(boundary)\r\n".data(using: .utf8)!)
+        formData.append("Content-Disposition: form-data; name=\"rom_ids\"\r\n\r\n".data(using: .utf8)!)
+        if let romIds = romIds, !romIds.isEmpty {
+            let romIdsJson = "[\(romIds.map(String.init).joined(separator: ","))]"
+            formData.append("\(romIdsJson)\r\n".data(using: .utf8)!)
+        } else {
+            formData.append("undefined\r\n".data(using: .utf8)!)
+        }
+        
+        // Close the form data
+        formData.append("------\(boundary)--\r\n".data(using: .utf8)!)
+        
+        logger.debug("📝 \(method) request URL: \(fullURL)")
+        logger.debug("📝 ROM IDs: \(romIds?.description ?? "nil")")
+        
+        // Create the request
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("multipart/form-data; boundary=----\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("Basic \(basicAuthToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json, text/plain, */*", forHTTPHeaderField: "Accept")
+        request.setValue(cleanServerURL, forHTTPHeaderField: "Origin")
+        request.setValue("\(cleanServerURL)/", forHTTPHeaderField: "Referer")
+        request.setValue("cors", forHTTPHeaderField: "Sec-Fetch-Mode")
+        request.setValue("same-origin", forHTTPHeaderField: "Sec-Fetch-Site")
+        
+        request.httpBody = formData
+        
+        // Perform the request
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIClientError.networkError(NSError(domain: "InvalidResponse", code: 0))
+            }
+            
+            logger.info("📡 \(method) response status: \(httpResponse.statusCode)")
+            
+            guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+                logger.error("Server error (\(httpResponse.statusCode)): \(errorMessage)")
+                throw APIClientError.invalidResponse(httpResponse.statusCode, errorMessage)
+            }
+            
+            let decodedCollection = try JSONDecoder().decode(CollectionSchema.self, from: data)
+            logger.info("✅ Collection \(method.lowercased()) successful: id=\(decodedCollection.id), name='\(decodedCollection.name)'")
+            
+            return decodedCollection
+            
+        } catch let urlError as URLError {
+            throw APIClientError.networkError(urlError)
+        } catch let decodingError as DecodingError {
+            throw APIClientError.decodingError(decodingError)
+        } catch let apiError as APIClientError {
+            throw apiError
+        } catch {
+            throw APIClientError.networkError(error)
+        }
+    }
+    
+    func updateCollection(
+        id: Int,
+        removeCover: Bool? = nil,
+        isPublic: Bool? = nil,
+        artwork: URL? = nil
+    ) async throws -> CollectionSchema {
+        setupAPIConfiguration()
+        return try await CollectionsAPI.updateCollectionApiCollectionsIdPut(
+            id: id,
+            removeCover: removeCover,
+            isPublic: isPublic,
+            artwork: artwork
+        )
+    }
+}
+
 // MARK: - Platforms API Wrapper
 extension RommAPIClient {
     func getPlatforms() async throws -> [PlatformSchema] {
+        setupAPIConfiguration()
         return try await PlatformsAPI.getPlatformsApiPlatformsGet()
     }
     
@@ -413,6 +674,7 @@ extension RommAPIClient {
         name: String,
         slug: String
     ) async throws -> PlatformSchema {
+        setupAPIConfiguration()
         let platformBody = BodyAddPlatformApiPlatformsPost(fsSlug: slug)
         return try await PlatformsAPI.addPlatformApiPlatformsPost(
             bodyAddPlatformApiPlatformsPost: platformBody
@@ -420,6 +682,7 @@ extension RommAPIClient {
     }
     
     func deletePlatform(id: Int) async throws -> String {
+        setupAPIConfiguration()
         return try await PlatformsAPI.deletePlatformApiPlatformsIdDelete(id: id)
     }
 }

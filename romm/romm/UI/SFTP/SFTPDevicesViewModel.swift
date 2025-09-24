@@ -10,10 +10,30 @@ class SFTPDevicesViewModel {
     var showingAddDevice = false
     var editingConnection: SFTPConnection?
     
-    private let sftpUseCases: SFTPUseCases
+    private let getAllConnectionsUseCase: GetAllConnectionsUseCase
+    private let saveConnectionUseCase: SaveConnectionUseCase
+    private let deleteConnectionUseCase: DeleteConnectionUseCase
+    private let manageDefaultConnectionUseCase: ManageDefaultConnectionUseCase
+    private let testConnectionUseCase: TestConnectionUseCase
+    private let checkConnectionStatusUseCase: CheckConnectionStatusUseCase
+    private let clearConnectionCacheUseCase: ClearConnectionCacheUseCase
     
-    init(sftpUseCases: SFTPUseCases = SFTPUseCases()) {
-        self.sftpUseCases = sftpUseCases
+    init(
+        getAllConnectionsUseCase: GetAllConnectionsUseCase,
+        saveConnectionUseCase: SaveConnectionUseCase,
+        deleteConnectionUseCase: DeleteConnectionUseCase,
+        manageDefaultConnectionUseCase: ManageDefaultConnectionUseCase,
+        testConnectionUseCase: TestConnectionUseCase,
+        checkConnectionStatusUseCase: CheckConnectionStatusUseCase,
+        clearConnectionCacheUseCase: ClearConnectionCacheUseCase
+    ) {
+        self.getAllConnectionsUseCase = getAllConnectionsUseCase
+        self.saveConnectionUseCase = saveConnectionUseCase
+        self.deleteConnectionUseCase = deleteConnectionUseCase
+        self.manageDefaultConnectionUseCase = manageDefaultConnectionUseCase
+        self.testConnectionUseCase = testConnectionUseCase
+        self.checkConnectionStatusUseCase = checkConnectionStatusUseCase
+        self.clearConnectionCacheUseCase = clearConnectionCacheUseCase
         
         loadConnections()
         Task {
@@ -22,7 +42,7 @@ class SFTPDevicesViewModel {
     }
     
     func loadConnections() {
-        connections = sftpUseCases.getAllConnections()
+        connections = getAllConnectionsUseCase.execute()
     }
     
     func addDevice() {
@@ -37,7 +57,7 @@ class SFTPDevicesViewModel {
     
     func saveConnection(_ connection: SFTPConnection, credentials: SFTPCredentials) {
         do {
-            try sftpUseCases.saveConnection(connection, credentials: credentials)
+            try saveConnectionUseCase.execute(connection, credentials: credentials)
             showingAddDevice = false
             editingConnection = nil
             error = nil
@@ -49,8 +69,8 @@ class SFTPDevicesViewModel {
     
     func deleteConnection(_ connection: SFTPConnection) {
         do {
-            try sftpUseCases.deleteConnection(connection)
-            sftpUseCases.clearConnectionCache(for: connection)
+            try deleteConnectionUseCase.execute(connection)
+            clearConnectionCacheUseCase.execute(for: connection)
             error = nil
             loadConnections() // Reload to get updated data
         } catch {
@@ -60,7 +80,7 @@ class SFTPDevicesViewModel {
     
     func setDefaultConnection(_ connection: SFTPConnection) {
         do {
-            try sftpUseCases.setDefaultConnection(connection)
+            try manageDefaultConnectionUseCase.setDefaultConnection(connection)
             error = nil
             loadConnections() // Reload to get updated data
         } catch {
@@ -69,7 +89,7 @@ class SFTPDevicesViewModel {
     }
     
     func testConnection(_ connection: SFTPConnection) async {
-        let status = await sftpUseCases.checkConnectionStatus(for: connection, forceRefresh: true)
+        let status = await checkConnectionStatusUseCase.execute(for: connection, forceRefresh: true)
         
         // Update the connection status in our local array
         connections = connections.map { conn in
@@ -82,11 +102,11 @@ class SFTPDevicesViewModel {
     }
     
     func refreshConnectionStatuses() async {
-        await sftpUseCases.checkAllConnectionStatuses(for: connections, forceRefresh: true)
+        await checkConnectionStatusUseCase.executeForAllConnections(for: connections, forceRefresh: true)
         
         // Update all connection statuses
         for i in 0..<connections.count {
-            let status = await sftpUseCases.checkConnectionStatus(for: connections[i])
+            let status = await checkConnectionStatusUseCase.execute(for: connections[i])
             connections[i].status = status
         }
     }

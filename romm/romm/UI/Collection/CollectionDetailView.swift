@@ -10,13 +10,13 @@ import SwiftUI
 
 struct CollectionDetailView: View {
     let collection: Collection
-    @StateObject private var viewModel: CollectionDetailViewModel
+    @State private var viewModel: CollectionDetailViewModel
     @State private var viewMode: ViewMode = ViewMode(rawValue: UserDefaults.standard.string(forKey: "selectedViewMode") ?? ViewMode.smallCard.rawValue) ?? .smallCard
     @State private var searchText = ""
     
     init(collection: Collection) {
         self.collection = collection
-        self._viewModel = StateObject(wrappedValue: CollectionDetailViewModel(collectionId: collection.id))
+        self._viewModel = State(wrappedValue: CollectionDetailViewModel(collectionId: collection.id))
     }
     
     var body: some View {
@@ -56,8 +56,7 @@ struct CollectionDetailView: View {
                             Spacer()
                             HStack {
                                 Spacer()
-                                ProgressView()
-                                    .scaleEffect(0.8)
+                                LoadingView("Loading more...")
                                     .padding(12)
                                     .background(Color(.systemBackground).opacity(0.9))
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -86,7 +85,6 @@ struct CollectionDetailView: View {
         }
         .navigationTitle(collection.name)
         .navigationBarTitleDisplayMode(.large)
-        .searchable(text: $searchText, prompt: "Search ROMs...")
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 // Sort/Filter Button
@@ -116,6 +114,7 @@ struct CollectionDetailView: View {
                 }
             }
         }
+        .toolbar(.hidden, for: .tabBar)
         .task {
             await viewModel.loadRoms()
         }

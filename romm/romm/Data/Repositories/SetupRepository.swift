@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Security
 
 // MARK: - Setup Data Models
 struct SetupConfiguration: Codable {
@@ -36,7 +35,6 @@ class SetupRepository: SetupRepositoryProtocol {
     private let logger = Logger.data
     
     // MARK: - Constants
-    private let keychainService = "com.romm.app.setup"
     private let userDefaultsPrefix = "setup_"
     
     // UserDefaults Keys
@@ -260,63 +258,7 @@ class SetupRepository: SetupRepositoryProtocol {
         return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
     
-    // MARK: - Private Keychain Methods
-    
-    private func saveToKeychain(key: String, value: String) throws {
-        let data = value.data(using: .utf8)!
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecAttrService as String: keychainService,
-            kSecValueData as String: data
-        ]
-        
-        // Delete existing item first
-        SecItemDelete(query as CFDictionary)
-        
-        // Add new item
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            logger.error("Keychain save error: \(status)")
-            throw SetupRepositoryError.keychainError(status)
-        }
-    }
-    
-    private func getFromKeychain(key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecAttrService as String: keychainService,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
-        var dataTypeRef: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
-        
-        guard status == errSecSuccess,
-              let data = dataTypeRef as? Data,
-              let value = String(data: data, encoding: .utf8) else {
-            return nil
-        }
-        
-        return value
-    }
-    
-    private func removeFromKeychain(key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: key,
-            kSecAttrService as String: keychainService
-        ]
-        
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            logger.error("Keychain delete error: \(status)")
-            throw SetupRepositoryError.keychainError(status)
-        }
-    }
+    // MARK: - Private Helper Methods (continued)
 }
 
 // MARK: - Setup Repository Error

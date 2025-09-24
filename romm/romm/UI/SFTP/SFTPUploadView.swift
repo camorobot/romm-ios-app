@@ -9,7 +9,7 @@ struct SFTPUploadView: View {
     
     init(rom: Rom, dependencyFactory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
         self.dependencyFactory = dependencyFactory
-        self._viewModel = State(initialValue: SFTPUploadViewModel(rom: rom))
+        self._viewModel = State(initialValue: SFTPUploadViewModel(rom: rom, apiClient: RommAPIClient.shared))
     }
     
     var body: some View {
@@ -41,7 +41,7 @@ struct SFTPUploadView: View {
                                 await viewModel.startUpload()
                             }
                         }
-                        .disabled(!viewModel.canUpload)
+                        .disabled(!viewModel.canUpload || viewModel.isCheckingDuplicates)
                     }
                 }
             }
@@ -70,19 +70,48 @@ struct SFTPUploadView: View {
     
     private var configurationView: some View {
         VStack(spacing: 24) {
-            // ROM Info
-            HStack {
+            // ROM Info - Enhanced with specific variant details
+            VStack(alignment: .leading, spacing: 8) {
+                Text("ROM")
+                    .font(.headline)
+                
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("ROM File")
-                        .font(.headline)
-                    Text(viewModel.rom.name)
+                    // Show specific file name if available, fallback to name
+                    Text(viewModel.rom.fileName ?? viewModel.rom.name)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    
+                    HStack(spacing: 12) {
+                        // ROM ID for debugging
+                        Text("ID: \(viewModel.rom.id)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        // ROM size if available
+                        if let sizeBytes = viewModel.rom.sizeBytes {
+                            Text("Size: \(ByteCountFormatter.string(fromByteCount: Int64(sizeBytes), countStyle: .file))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    // Show general ROM name as subtitle if fileName is different
+                    if let fileName = viewModel.rom.fileName, fileName != viewModel.rom.name {
+                        Text(viewModel.rom.name)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .italic()
+                    }
                 }
-                Spacer()
             }
             
-            Divider()
+            // File Selection (only show if multiple files available)
+            if viewModel.availableFiles.count > 1 {
+                Divider()
+                fileSelectionView
+                Divider()
+            }
             
             // Device Selection
             VStack(alignment: .leading, spacing: 12) {
@@ -140,6 +169,11 @@ struct SFTPUploadView: View {
                 }
             }
             
+            // Duplicate Files Warning
+            if viewModel.hasDuplicateWarnings {
+                duplicateWarningsSection
+            }
+            
             // Storage Warning
             if let storageWarning = viewModel.storageWarning {
                 VStack(spacing: 8) {
@@ -170,14 +204,32 @@ struct SFTPUploadView: View {
                     .font(.system(size: 60))
                     .foregroundColor(.accentColor)
                 
-                Text(viewModel.isPreparing ? "Preparing ROM..." : "Uploading ROM...")
+                let fileCount = viewModel.totalFiles
+                Text(viewModel.isPreparing ? 
+                     (fileCount > 1 ? "Preparing \(fileCount) files..." : "Preparing ROM...") : 
+                     (fileCount > 1 ? "Uploading \(fileCount) files..." : "Uploading ROM..."))
                     .font(.title2)
                     .fontWeight(.semibold)
                 
-                Text(viewModel.rom.name)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
+                VStack(spacing: 4) {
+                    Text(viewModel.rom.fileName ?? viewModel.rom.name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.center)
+                    
+                    if let fileName = viewModel.rom.fileName, fileName != viewModel.rom.name {
+                        Text(viewModel.rom.name)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    
+                    Text("ROM ID: \(viewModel.rom.id)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
             
             // Progress Bar
@@ -215,7 +267,8 @@ struct SFTPUploadView: View {
                     .font(.title2)
                     .fontWeight(.semibold)
                 
-                Text("Your ROM has been successfully transferred to the device.")
+                let fileCount = viewModel.totalFiles
+                Text(fileCount > 1 ? "All \(fileCount) files have been successfully transferred to the device." : "Your ROM has been successfully transferred to the device.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -223,12 +276,32 @@ struct SFTPUploadView: View {
             
             // Details
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("ROM:")
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text(viewModel.rom.name)
-                        .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("ROM:")
+                            .fontWeight(.medium)
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(viewModel.rom.fileName ?? viewModel.rom.name)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.trailing)
+                            
+                            if let fileName = viewModel.rom.fileName, fileName != viewModel.rom.name {
+                                Text(viewModel.rom.name)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                        }
+                    }
+                    
+                    HStack {
+                        Text("ROM ID:")
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text("\(viewModel.rom.id)")
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
                 HStack {
@@ -267,6 +340,208 @@ struct SFTPUploadView: View {
             Spacer()
         }
         .padding()
+    }
+    
+    private var fileSelectionView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Files to Upload")
+                    .font(.headline)
+                
+                Spacer()
+                
+                HStack(spacing: 12) {
+                    Button("Select All") {
+                        viewModel.selectAllFiles()
+                    }
+                    .font(.caption)
+                    .disabled(viewModel.isLoadingFiles)
+                    
+                    Button("Deselect All") {
+                        viewModel.deselectAllFiles()
+                    }
+                    .font(.caption)
+                    .disabled(viewModel.isLoadingFiles)
+                }
+            }
+            
+            if viewModel.isLoadingFiles {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading files...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+            } else if viewModel.availableFiles.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "doc.questionmark")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                    Text("No files found")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+            } else {
+                LazyVStack(spacing: 8) {
+                    ForEach(viewModel.availableFiles) { fileInfo in
+                        FileSelectionRow(
+                            fileInfo: fileInfo,
+                            isSelected: viewModel.selectedFiles.contains(fileInfo.id),
+                            onToggle: { viewModel.toggleFileSelection(fileInfo.id) }
+                        )
+                    }
+                }
+            }
+            
+            if !viewModel.selectedFilesList.isEmpty {
+                HStack {
+                    Text("Selected: \(viewModel.selectedFiles.count) file(s)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    let totalSize = viewModel.selectedFilesList.reduce(0) { $0 + $1.fileSizeBytes }
+                    Text("Total: \(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var duplicateWarningsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                    .font(.title3)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Duplicate Files Detected")
+                        .font(.headline)
+                        .foregroundColor(.orange)
+                    
+                    Text("The following files already exist on the server:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                if viewModel.isCheckingDuplicates {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
+            
+            VStack(spacing: 8) {
+                ForEach(Array(viewModel.duplicateWarnings.values), id: \.id) { duplicateInfo in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: duplicateInfo.sizeMatch ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .foregroundColor(duplicateInfo.sizeMatch ? .green : .red)
+                            .font(.caption)
+                            .padding(.top, 2)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(duplicateInfo.fileName)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+                            
+                            Text(duplicateInfo.warningMessage)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(duplicateInfo.sizeMatch ? Color.green.opacity(0.05) : Color.red.opacity(0.05))
+                    .cornerRadius(6)
+                }
+            }
+            
+            HStack {
+                Image(systemName: "info.circle")
+                    .foregroundColor(.blue)
+                
+                Text("Files with matching size and name will be skipped. Different sizes indicate potential overwrites.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 4)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.orange.opacity(0.05))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+        )
+        .padding(.horizontal)
+    }
+}
+
+struct FileSelectionRow: View {
+    let fileInfo: RomFileInfo
+    let isSelected: Bool
+    let onToggle: () -> Void
+    
+    var body: some View {
+        Button(action: onToggle) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(fileInfo.fileName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    
+                    HStack(spacing: 8) {
+                        Text(fileInfo.displaySize)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        if !fileInfo.fileExtension.isEmpty {
+                            Text(fileInfo.fileExtension.uppercased())
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue.opacity(0.1))
+                                .foregroundColor(.blue)
+                                .cornerRadius(4)
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .font(.title3)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? Color.accentColor.opacity(0.1) : Color(.systemGray6))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

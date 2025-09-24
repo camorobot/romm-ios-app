@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Observation
 
 enum PlatformDetailViewState {
     case loading
@@ -15,11 +16,22 @@ enum PlatformDetailViewState {
     case error(String)
 }
 
+@Observable
 @MainActor
-class PlatformDetailViewModel: ObservableObject {
-    @Published var viewState: PlatformDetailViewState = .loading
-    @Published var charIndex: [String: Int] = [:] // A-Z index with counts
-    @Published var selectedChar: String? = nil // Currently selected character filter
+class PlatformDetailViewModel {
+    var viewState: PlatformDetailViewState = .loading
+    var charIndex: [String: Int] = [:] // A-Z index with counts
+    var selectedChar: String? = nil // Currently selected character filter
+    var lastLoadedRoms: [Rom] = [] // Keep last loaded ROMs for smooth transitions
+    var viewMode: ViewMode = .smallCard
+    
+    var hasLoadedRoms: Bool {
+        !lastLoadedRoms.isEmpty
+    }
+    
+    func hasDataFor(platformId: Int) -> Bool {
+        return currentPlatformId == platformId && hasLoadedRoms
+    }
     
     var canLoadMore: Bool {
         hasMoreRoms
@@ -27,17 +39,31 @@ class PlatformDetailViewModel: ObservableObject {
     
     private let logger = Logger.viewModel
     private let romsUseCase: GetRomsUseCase
+    private let getViewModeUseCase: GetViewModeUseCaseProtocol
+    private let saveViewModeUseCase: SaveViewModeUseCaseProtocol
     private var currentOffset = 0
     private let pageSize = 72
     private var hasMoreRoms = true
     private var totalRoms = 0
     private var currentPlatformId: Int?
     private var currentChar: String?
-    @Published var currentOrderBy: String = "name"
-    @Published var currentOrderDir: String = "asc"
+    var currentOrderBy: String = UserDefaults.standard.string(forKey: "selectedSortOrderBy") ?? "name"
+    var currentOrderDir: String = UserDefaults.standard.string(forKey: "selectedSortOrderDir") ?? "asc"
     
     init(factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
         self.romsUseCase = factory.makeGetRomsUseCase()
+        self.getViewModeUseCase = factory.makeGetViewModeUseCase()
+        self.saveViewModeUseCase = factory.makeSaveViewModeUseCase()
+        loadViewMode()
+    }
+    
+    private func loadViewMode() {
+        viewMode = getViewModeUseCase.execute()
+    }
+    
+    func updateViewMode(_ newMode: ViewMode) {
+        viewMode = newMode
+        saveViewModeUseCase.execute(newMode)
     }
     
     func loadRoms(for platformId: Int, refresh: Bool = false) async {
@@ -51,6 +77,7 @@ class PlatformDetailViewModel: ObservableObject {
             totalRoms = 0
             charIndex = [:]
             selectedChar = nil
+            lastLoadedRoms = [] // Clear cached ROMs on refresh
         }
         
         // Check if already loading (but allow first load)
@@ -65,9 +92,13 @@ class PlatformDetailViewModel: ObservableObject {
         
         guard hasMoreRoms else { return }
         
-        // Set appropriate loading state
-        if currentOffset == 0 || refresh {
+        // Set appropriate loading state - avoid full-screen loading if we have data
+        if (currentOffset == 0 || refresh) && !hasLoadedRoms {
+            // Only show full loading screen if we've never loaded anything
             viewState = .loading
+        } else if hasLoadedRoms && (currentOffset == 0 || refresh) {
+            // If we have data but are refreshing, keep showing data with indicator
+            viewState = .loading // View will show content with loading indicator
         } else if case .loaded(let currentRoms) = viewState {
             viewState = .loadingMore(currentRoms)
         }
@@ -116,6 +147,7 @@ class PlatformDetailViewModel: ObservableObject {
                 viewState = .empty("No ROMs found for this platform")
             } else {
                 viewState = .loaded(allRoms)
+                lastLoadedRoms = allRoms // Update cached ROMs for smooth transitions
             }
             
             currentOffset = response.offset + response.limit
@@ -199,6 +231,10 @@ class PlatformDetailViewModel: ObservableObject {
         
         currentOrderBy = orderBy
         currentOrderDir = orderDir
+        
+        // Persist sort settings
+        UserDefaults.standard.set(orderBy, forKey: "selectedSortOrderBy")
+        UserDefaults.standard.set(orderDir, forKey: "selectedSortOrderDir")
         
         // Reload data with new sorting
         guard let platformId = currentPlatformId else { return }

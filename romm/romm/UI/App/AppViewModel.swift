@@ -2,12 +2,13 @@
 //  AppViewModel.swift
 //  romm
 //
-//  Created by Claude on 08.08.25.
+//  Created by Ilyas Hallak on 08.08.25.
 //
 
 import Foundation
 import Combine
 import os
+import Observation
 
 enum AppState {
     case loading
@@ -16,9 +17,10 @@ enum AppState {
     case authenticationFailed
 }
 
+@Observable
 @MainActor
-class AppViewModel: ObservableObject {
-    @Published var appState: AppState = .loading
+class AppViewModel {
+    var appState: AppState = .loading
     
     private let logger = Logger.viewModel
     

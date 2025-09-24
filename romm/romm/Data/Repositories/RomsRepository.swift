@@ -84,7 +84,9 @@ class RomsRepository: RomsRepositoryProtocol {
         do {
             // ROM favorites are managed through the Favourites collection (usually ID 2)
             // First, get the current Favourites collection to get existing ROM IDs
+            logger.debug("📱 Fetching favorites collection...")
             let favouritesCollection = try await apiClient.get("api/collections/2", responseType: CollectionSchema.self)
+            logger.debug("📱 Got favorites collection with \(favouritesCollection.romIds.count) ROMs")
             var currentRomIds = Array(favouritesCollection.romIds)
             
             // Add or remove the ROM from the favorites collection
@@ -117,12 +119,29 @@ class RomsRepository: RomsRepositoryProtocol {
             formData.append("--\(boundary)--\r\n".data(using: .utf8)!)
             
             // Make request via the API client with custom multipart data
-            let path = "api/collections/2?is_public=\(favouritesCollection.isPublic)&remove_cover=false"
+            let isPublicValue = favouritesCollection.isPublic ?? false ? "true" : "false"
+            let path = "api/collections/2?is_public=\(isPublicValue)&remove_cover=false"
+            logger.debug("📱 Making multipart request to: \(path)")
+            logger.debug("📱 Sending ROM IDs: [\(currentRomIds.map(String.init).joined(separator: ","))]")
+            
             _ = try await makeMultipartRequest(path: path, boundary: boundary, formData: formData)
             
             logger.info("✅ ROM favorite toggled: \(romId)")
         } catch {
             logger.error("❌ Error toggling ROM favorite: \(error)")
+            
+            // Check if it's already a RomError, if so, rethrow it
+            if let romError = error as? RomError {
+                throw romError
+            }
+            
+            // For other errors, provide more context
+            if error.localizedDescription.contains("The Internet connection appears to be offline") {
+                logger.error("❌ Network connectivity issue")
+            } else if error.localizedDescription.contains("401") || error.localizedDescription.contains("403") {
+                logger.error("❌ Authentication issue")
+            }
+            
             throw RomError.networkError
         }
     }
@@ -158,8 +177,14 @@ class RomsRepository: RomsRepositoryProtocol {
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              200...299 ~= httpResponse.statusCode else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            logger.error("❌ Invalid HTTP response for favorite toggle")
+            throw RomError.networkError
+        }
+        
+        guard 200...299 ~= httpResponse.statusCode else {
+            let responseBody = String(data: data, encoding: .utf8) ?? "No response body"
+            logger.error("❌ HTTP Error \(httpResponse.statusCode) for favorite toggle: \(responseBody)")
             throw RomError.networkError
         }
         
@@ -184,8 +209,28 @@ class RomsRepository: RomsRepositoryProtocol {
     }
     
     func searchRoms(query: String) async throws -> [Rom] {
+        logger.info("🔍 Direct API Search: Searching ROMs with query: '\(query)'")
+        
+        do {
+            // Use OpenAPI directly for search
+            let response = try await apiClient.searchRomsWithOpenAPI(query: query)
+            let domainRoms = response.items.mapToDomain()
+            
+            logger.info("✅ Direct API Search: Found \(domainRoms.count) ROMs out of \(response.total ?? 0) total matches")
+            return domainRoms
+        } catch {
+            logger.error("❌ Direct API Search failed: \(error)")
+            throw RomError.networkError
+        }
+    }
+    
+    func searchRomsLegacy(query: String) async throws -> [Rom] {
+        logger.info("🔍 Legacy Search: Searching ROMs with query: '\(query)'")
+        
         // Search ROMs using the normal getRoms API with search term
         let response = try await getRoms(platformId: nil, searchTerm: query, limit: 50, offset: 0, collectionId: nil)
+        
+        logger.info("🔍 Legacy Search completed: found \(response.roms.count) ROMs out of \(response.total) total matches")
         return response.roms
     }
 }

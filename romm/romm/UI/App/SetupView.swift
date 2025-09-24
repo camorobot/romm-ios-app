@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SetupView: View {
-    @EnvironmentObject var appViewModel: AppViewModel
+    let appViewModel: AppViewModel
     @State private var serverURL = "https://romm.mnk.any64.de"
     @State private var username = "admin"
     @State private var password = "diggah"
@@ -83,9 +83,8 @@ struct SetupView: View {
                 } label: {
                     if appViewModel.appData.isLoading {
                         HStack {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.8)
+                            LoadingView()
+                                .frame(width: 20, height: 20)
                             Text("Connecting...")
                         }
                     } else {
@@ -127,9 +126,4 @@ struct SetupView: View {
     private func hideKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
-}
-
-#Preview {
-    SetupView()
-        .environmentObject(AppViewModel())
 }

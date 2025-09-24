@@ -2,7 +2,7 @@
 //  PaginatedRomsResponse.swift
 //  romm
 //
-//  Created by Claude on 08.08.25.
+//  Created by Ilyas Hallak on 08.08.25.
 //
 
 import Foundation

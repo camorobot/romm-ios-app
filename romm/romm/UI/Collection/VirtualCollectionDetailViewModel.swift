@@ -6,11 +6,13 @@
 //
 
 import Foundation
+import Observation
 
+@Observable
 @MainActor
-class VirtualCollectionDetailViewModel: ObservableObject {
+class VirtualCollectionDetailViewModel {
     private let logger = Logger.viewModel
-    @Published var viewState: ViewState = .loading
+    var viewState: ViewState = .loading
     
     private var virtualCollectionId: String
     

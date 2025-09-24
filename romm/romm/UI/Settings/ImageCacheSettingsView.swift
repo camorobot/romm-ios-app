@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 struct ImageCacheSettingsView: View {
     @StateObject private var settings = ImageCacheSettings.shared
@@ -31,22 +32,34 @@ struct ImageCacheSettingsView: View {
             // Cache Status Section
             Section("Cache Status") {
                 VStack(spacing: 12) {
-                    cacheUsageRow(
-                        title: "Memory Cache",
-                        usage: cacheStatistics.formattedMemoryUsage,
-                        percentage: cacheStatistics.memoryPercentage
-                    )
-                    
+                    // Only show disk cache since memory cache is not measurable
                     cacheUsageRow(
                         title: "Disk Cache",
                         usage: cacheStatistics.formattedDiskUsage,
                         percentage: cacheStatistics.diskPercentage
                     )
+                    
+                    // Info about memory cache
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Memory Cache")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Text("100 MB limit (fixed)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text("Memory cache is automatically managed by the system")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .padding(.vertical, 4)
                 
                 Button("Refresh Statistics") {
-                    refreshStatistics()
+                    refreshStatisticsAsync()
                 }
                 .foregroundColor(.accentColor)
             }
@@ -58,28 +71,6 @@ struct ImageCacheSettingsView: View {
                 if settings.cacheEnabled {
                     Toggle("Enable Image Preloading", isOn: $settings.preloadEnabled)
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Memory Cache Limit")
-                            Spacer()
-                            Text("\(settings.memoryCacheLimitMB) MB")
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Slider(
-                            value: Binding(
-                                get: { Double(settings.memoryCacheLimitMB) },
-                                set: { settings.memoryCacheLimitMB = Int($0) }
-                            ),
-                            in: 10...500,
-                            step: 10
-                        )
-                        
-                        Text("Recommended: 50-200 MB")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.vertical, 4)
                     
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -131,11 +122,13 @@ struct ImageCacheSettingsView: View {
             
             // Cache Management Section
             Section("Cache Management") {
-                Button("Clear Memory Cache") {
-                    clearCacheType = .memory
-                    showingClearConfirmation = true
+                Button("Force Cache Cleanup") {
+                    KingfisherCacheManager.shared.forceCacheCleanup()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        refreshStatisticsAsync()
+                    }
                 }
-                .foregroundColor(.orange)
+                .foregroundColor(.blue)
                 
                 Button("Clear Disk Cache") {
                     clearCacheType = .disk
@@ -151,7 +144,7 @@ struct ImageCacheSettingsView: View {
                 
                 Button("Reset to Defaults") {
                     settings.resetToDefaults()
-                    refreshStatistics()
+                    refreshStatisticsAsync()
                 }
                 .foregroundColor(.blue)
             }
@@ -159,15 +152,15 @@ struct ImageCacheSettingsView: View {
             // Information Section
             Section("Information") {
                 CacheInfoRow(title: "Image caching improves performance by storing downloaded images locally.")
-                CacheInfoRow(title: "Memory cache provides instant access but is cleared when the app is terminated.")
-                CacheInfoRow(title: "Disk cache persists between app launches but uses storage space.")
+                CacheInfoRow(title: "Memory cache is automatically managed by iOS and cleared when needed.")
+                CacheInfoRow(title: "Disk cache persists between app launches and can be manually cleared.")
                 CacheInfoRow(title: "Preloading downloads images in advance for smoother scrolling.")
             }
         }
         .navigationTitle("Image Cache")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            refreshStatistics()
+            refreshStatisticsAsync()
         }
         .alert(clearCacheType.title, isPresented: $showingClearConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -213,8 +206,21 @@ struct ImageCacheSettingsView: View {
         cacheStatistics = settings.getCacheStatistics()
     }
     
+    private func refreshStatisticsAsync() {
+        KingfisherCacheManager.shared.getCacheUsageAsync { memoryUsed, diskUsed in
+            self.cacheStatistics = CacheStatistics(
+                memoryCacheUsedMB: 0, // Memory not measurable
+                memoryCacheLimitMB: 100, // Fixed 100MB
+                diskCacheUsedMB: diskUsed / (1024 * 1024),
+                diskCacheLimitMB: self.settings.diskCacheLimitMB,
+                memoryUtilization: 0, // Memory not measurable
+                diskUtilization: Double(diskUsed) / Double(self.settings.diskCacheLimitBytes)
+            )
+        }
+    }
+    
     private func performCacheClear() {
-        let cacheManager = ImageCacheManager.shared
+        let cacheManager = KingfisherCacheManager.shared
         
         switch clearCacheType {
         case .memory:
@@ -227,7 +233,7 @@ struct ImageCacheSettingsView: View {
         
         // Refresh statistics after a brief delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            refreshStatistics()
+            refreshStatisticsAsync()
         }
     }
 }

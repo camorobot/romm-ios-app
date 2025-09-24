@@ -1,0 +1,35 @@
+//
+//  TestConnectionUseCase.swift
+//  romm
+//
+//  Created by Ilyas Hallak on 27.08.25.
+//
+
+import Foundation
+
+class TestConnectionUseCase {
+    private let connectionManager: SFTPConnectionManager
+    
+    init(connectionManager: SFTPConnectionManager = SFTPConnectionManager.shared) {
+        self.connectionManager = connectionManager
+    }
+    
+    func execute(_ connection: SFTPConnection) async -> Bool {
+        let status = await connectionManager.checkConnectionStatus(for: connection, forceRefresh: true)
+        return status == .connected
+    }
+    
+    func executeWithCredentials(_ connection: SFTPConnection, credentials: SFTPCredentials) async -> Bool {
+        do {
+            let service = SFTPService()
+            return try await service.testConnectionWithCredentials(connection, credentials: credentials)
+        } catch {
+            return false
+        }
+    }
+    
+    func executeWithCredentialsThrows(_ connection: SFTPConnection, credentials: SFTPCredentials) async throws -> Bool {
+        let service = SFTPService()
+        return try await service.testConnectionWithCredentials(connection, credentials: credentials)
+    }
+}

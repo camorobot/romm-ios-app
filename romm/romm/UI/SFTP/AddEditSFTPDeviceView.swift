@@ -135,8 +135,8 @@ struct AddEditSFTPDeviceView: View {
                 Spacer()
                 
                 if viewModel.isTestingConnection {
-                    ProgressView()
-                        .scaleEffect(0.8)
+                    LoadingView()
+                        .frame(width: 20, height: 20)
                 } else if let testResult = viewModel.testResult {
                     connectionTestResult(testResult)
                 }

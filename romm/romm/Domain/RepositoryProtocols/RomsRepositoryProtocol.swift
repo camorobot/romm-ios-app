@@ -13,4 +13,5 @@ protocol RomsRepositoryProtocol {
     func toggleRomFavorite(romId: Int, isFavorite: Bool) async throws
     func isRomFavorite(romId: Int) async throws -> Bool
     func searchRoms(query: String) async throws -> [Rom]
+    func searchRomsLegacy(query: String) async throws -> [Rom]
 }

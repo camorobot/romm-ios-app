@@ -15,12 +15,14 @@ protocol DependencyFactoryProtocol {
     var collectionsRepository: CollectionsRepositoryProtocol { get }
     var setupRepository: SetupRepositoryProtocol { get }
     var sftpRepository: SFTPRepositoryProtocol { get }
+    var fileSystemRepository: FileSystemRepositoryProtocol { get }
     
     // Services
     var sftpKeychainService: SFTPKeychainServiceProtocol { get }
     var sftpService: SFTPServiceProtocol { get }
     var sftpConnectionManager: SFTPConnectionManager { get }
     var apiClient: RommAPIClientProtocol { get }
+    var fileValidationService: FileValidationServiceProtocol { get }
     
     // Use Cases
     func makeLogoutUseCase() -> LogoutUseCase
@@ -30,10 +32,14 @@ protocol DependencyFactoryProtocol {
     func makeToggleRomFavoriteUseCase() -> ToggleRomFavoriteUseCase
     func makeCheckRomFavoriteStatusUseCase() -> CheckRomFavoriteStatusUseCase
     func makeSearchRomsUseCase() -> SearchRomsUseCase
+    func makeLoadManualUseCase() -> LoadManualUseCase
     func makeGetPlatformsUseCase() -> GetPlatformsUseCase
     func makeAddPlatformUseCase() -> AddPlatformUseCase
     func makeGetCollectionsUseCase() -> GetCollectionsUseCase
     func makeGetVirtualCollectionsUseCase() -> GetVirtualCollectionsUseCase
+    func makeCreateCollectionUseCase() -> CreateCollectionUseCase
+    func makeUpdateCollectionUseCase() -> UpdateCollectionUseCase
+    func makeDeleteCollectionUseCase() -> DeleteCollectionUseCase
     
     // Setup Use Cases
     func makeSaveSetupConfigurationUseCase() -> SaveSetupConfigurationUseCaseProtocol
@@ -42,7 +48,22 @@ protocol DependencyFactoryProtocol {
     func makeClearSetupConfigurationUseCase() -> ClearSetupConfigurationUseCaseProtocol
     
     // SFTP Use Cases
-    func makeSFTPUseCases() -> SFTPUseCases
+    func makeGetAllConnectionsUseCase() -> GetAllConnectionsUseCase
+    func makeListDirectoryUseCase() -> ListDirectoryUseCase
+    func makeUploadFileUseCase() -> UploadFileUseCase
+    func makeTestConnectionUseCase() -> TestConnectionUseCase
+    func makeSaveConnectionUseCase() -> SaveConnectionUseCase
+    func makeDeleteConnectionUseCase() -> DeleteConnectionUseCase
+    func makeManageDefaultConnectionUseCase() -> ManageDefaultConnectionUseCase
+    func makeManageFavoriteDirectoriesUseCase() -> ManageFavoriteDirectoriesUseCase
+    func makeCreateSFTPDirectoryUseCase() -> CreateSFTPDirectoryUseCase
+    func makeCheckConnectionStatusUseCase() -> CheckConnectionStatusUseCase
+    func makeClearConnectionCacheUseCase() -> ClearConnectionCacheUseCase
+    func makeGetCredentialsUseCase() -> GetCredentialsUseCase
+    
+    // UI Use Cases  
+    func makeGetViewModeUseCase() -> GetViewModeUseCaseProtocol
+    func makeSaveViewModeUseCase() -> SaveViewModeUseCaseProtocol
     
     // SFTP ViewModels
     @MainActor func makeSFTPDevicesViewModel() -> SFTPDevicesViewModel
@@ -61,6 +82,11 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     lazy var platformsRepository: PlatformsRepositoryProtocol = PlatformsRepository()
     lazy var collectionsRepository: CollectionsRepositoryProtocol = CollectionsRepository()
     lazy var setupRepository: SetupRepositoryProtocol = SetupRepository()
+    lazy var fileSystemRepository: FileSystemRepositoryProtocol = FileSystemRepository()
+    
+    // MARK: - Services (Singletons)
+    
+    lazy var fileValidationService: FileValidationServiceProtocol = FileValidationService()
     
     // MARK: - SFTP Services (Singletons)
     
@@ -108,6 +134,10 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
         SearchRomsUseCase(romsRepository: romsRepository)
     }
     
+    func makeLoadManualUseCase() -> LoadManualUseCase {
+        LoadManualUseCase()
+    }
+    
     // MARK: - Platform Use Cases
     
     func makeGetPlatformsUseCase() -> GetPlatformsUseCase {
@@ -126,6 +156,18 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     
     func makeGetVirtualCollectionsUseCase() -> GetVirtualCollectionsUseCase {
         GetVirtualCollectionsUseCase(collectionsRepository: collectionsRepository)
+    }
+    
+    func makeCreateCollectionUseCase() -> CreateCollectionUseCase {
+        CreateCollectionUseCase(collectionsRepository: collectionsRepository)
+    }
+    
+    func makeUpdateCollectionUseCase() -> UpdateCollectionUseCase {
+        UpdateCollectionUseCase(collectionsRepository: collectionsRepository)
+    }
+    
+    func makeDeleteCollectionUseCase() -> DeleteCollectionUseCase {
+        DeleteCollectionUseCase(collectionsRepository: collectionsRepository)
     }
     
     // MARK: - Setup Use Cases
@@ -153,168 +195,99 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     
     // MARK: - SFTP Use Cases
     
-    func makeSFTPUseCases() -> SFTPUseCases {
-        SFTPUseCases(repository: sftpRepository, connectionManager: sftpConnectionManager)
+    func makeGetAllConnectionsUseCase() -> GetAllConnectionsUseCase {
+        GetAllConnectionsUseCase(repository: sftpRepository)
+    }
+    
+    func makeListDirectoryUseCase() -> ListDirectoryUseCase {
+        ListDirectoryUseCase(connectionManager: sftpConnectionManager)
+    }
+    
+    func makeUploadFileUseCase() -> UploadFileUseCase {
+        UploadFileUseCase(connectionManager: sftpConnectionManager)
+    }
+    
+    func makeTestConnectionUseCase() -> TestConnectionUseCase {
+        TestConnectionUseCase(connectionManager: sftpConnectionManager)
+    }
+    
+    func makeSaveConnectionUseCase() -> SaveConnectionUseCase {
+        SaveConnectionUseCase(repository: sftpRepository)
+    }
+    
+    func makeDeleteConnectionUseCase() -> DeleteConnectionUseCase {
+        DeleteConnectionUseCase(repository: sftpRepository)
+    }
+    
+    func makeManageDefaultConnectionUseCase() -> ManageDefaultConnectionUseCase {
+        ManageDefaultConnectionUseCase(repository: sftpRepository)
+    }
+    
+    func makeManageFavoriteDirectoriesUseCase() -> ManageFavoriteDirectoriesUseCase {
+        ManageFavoriteDirectoriesUseCase(repository: sftpRepository)
+    }
+    
+    func makeCreateSFTPDirectoryUseCase() -> CreateSFTPDirectoryUseCase {
+        CreateSFTPDirectoryUseCase(connectionManager: sftpConnectionManager)
+    }
+    
+    func makeCheckConnectionStatusUseCase() -> CheckConnectionStatusUseCase {
+        CheckConnectionStatusUseCase(connectionManager: sftpConnectionManager)
+    }
+    
+    func makeClearConnectionCacheUseCase() -> ClearConnectionCacheUseCase {
+        ClearConnectionCacheUseCase(connectionManager: sftpConnectionManager)
+    }
+    
+    func makeGetCredentialsUseCase() -> GetCredentialsUseCase {
+        GetCredentialsUseCase(repository: sftpRepository)
+    }
+    
+    // MARK: - UI Use Cases
+    
+    func makeGetViewModeUseCase() -> GetViewModeUseCaseProtocol {
+        GetViewModeUseCase()
+    }
+    
+    func makeSaveViewModeUseCase() -> SaveViewModeUseCaseProtocol {
+        SaveViewModeUseCase()
     }
     
     // MARK: - SFTP ViewModels
     
     @MainActor func makeSFTPDevicesViewModel() -> SFTPDevicesViewModel {
-        SFTPDevicesViewModel(sftpUseCases: makeSFTPUseCases())
-    }
-    
-    @MainActor func makeSFTPDirectoryBrowserViewModel(connection: SFTPConnection) -> SFTPDirectoryBrowserViewModel {
-        SFTPDirectoryBrowserViewModel(connection: connection, sftpUseCases: makeSFTPUseCases())
-    }
-    
-    @MainActor func makeSFTPUploadViewModel(rom: Rom) -> SFTPUploadViewModel {
-        SFTPUploadViewModel(rom: rom, sftpUseCases: makeSFTPUseCases(), apiClient: apiClient)
-    }
-    
-    @MainActor func makeAddEditSFTPDeviceViewModel(connection: SFTPConnection?) -> AddEditSFTPDeviceViewModel {
-        AddEditSFTPDeviceViewModel(connection: connection, sftpUseCases: makeSFTPUseCases())
-    }
-}
-
-// MARK: - Mock Factory for Testing
-
-class MockDependencyFactory: DependencyFactoryProtocol {
-    
-    // Mock repositories can be injected for testing
-    var authRepository: AuthRepositoryProtocol
-    var romsRepository: RomsRepositoryProtocol
-    var platformsRepository: PlatformsRepositoryProtocol
-    var collectionsRepository: CollectionsRepositoryProtocol
-    var setupRepository: SetupRepositoryProtocol
-    var sftpRepository: SFTPRepositoryProtocol
-    
-    // Mock services
-    var sftpKeychainService: SFTPKeychainServiceProtocol
-    var sftpService: SFTPServiceProtocol
-    var sftpConnectionManager: SFTPConnectionManager
-    var apiClient: RommAPIClientProtocol
-    
-    init(
-        authRepository: AuthRepositoryProtocol? = nil,
-        romsRepository: RomsRepositoryProtocol? = nil,
-        platformsRepository: PlatformsRepositoryProtocol? = nil,
-        collectionsRepository: CollectionsRepositoryProtocol? = nil,
-        setupRepository: SetupRepositoryProtocol? = nil,
-        sftpRepository: SFTPRepositoryProtocol? = nil,
-        sftpKeychainService: SFTPKeychainServiceProtocol? = nil,
-        sftpService: SFTPServiceProtocol? = nil,
-        sftpConnectionManager: SFTPConnectionManager? = nil,
-        apiClient: RommAPIClientProtocol? = nil
-    ) {
-        // Use provided mocks or default to real implementations
-        self.authRepository = authRepository ?? AuthRepository()
-        self.romsRepository = romsRepository ?? RomsRepository()
-        self.platformsRepository = platformsRepository ?? PlatformsRepository()
-        self.collectionsRepository = collectionsRepository ?? CollectionsRepository()
-        self.setupRepository = setupRepository ?? SetupRepository()
-        
-        let keychainService = sftpKeychainService ?? SFTPKeychainService()
-        self.sftpKeychainService = keychainService
-        self.sftpRepository = sftpRepository ?? SFTPRepository(keychainService: keychainService)
-        self.sftpService = sftpService ?? SFTPService(repository: self.sftpRepository)
-        
-        if let providedManager = sftpConnectionManager {
-            self.sftpConnectionManager = providedManager
-        } else {
-            let manager = SFTPConnectionManager.shared
-            manager.configure(with: self.sftpService)
-            self.sftpConnectionManager = manager
-        }
-        
-        self.apiClient = apiClient ?? RommAPIClient.shared
-    }
-    
-    func makeLogoutUseCase() -> LogoutUseCase {
-        LogoutUseCase(authRepository: authRepository)
-    }
-    
-    func makeGetCurrentUserUseCase() -> GetCurrentUserUseCase {
-        GetCurrentUserUseCase(authRepository: authRepository)
-    }
-    
-    func makeGetRomsUseCase() -> GetRomsUseCase {
-        GetRomsUseCase(romsRepository: romsRepository)
-    }
-    
-    func makeGetRomDetailsUseCase() -> GetRomDetailsUseCase {
-        GetRomDetailsUseCase(romsRepository: romsRepository)
-    }
-    
-    func makeToggleRomFavoriteUseCase() -> ToggleRomFavoriteUseCase {
-        ToggleRomFavoriteUseCase(romsRepository: romsRepository)
-    }
-    
-    func makeCheckRomFavoriteStatusUseCase() -> CheckRomFavoriteStatusUseCase {
-        CheckRomFavoriteStatusUseCase(romsRepository: romsRepository)
-    }
-    
-    func makeSearchRomsUseCase() -> SearchRomsUseCase {
-        SearchRomsUseCase(romsRepository: romsRepository)
-    }
-    
-    func makeGetPlatformsUseCase() -> GetPlatformsUseCase {
-        GetPlatformsUseCase(platformsRepository: platformsRepository)
-    }
-    
-    func makeAddPlatformUseCase() -> AddPlatformUseCase {
-        AddPlatformUseCase(platformsRepository: platformsRepository)
-    }
-    
-    func makeGetCollectionsUseCase() -> GetCollectionsUseCase {
-        GetCollectionsUseCase(collectionsRepository: collectionsRepository)
-    }
-    
-    func makeGetVirtualCollectionsUseCase() -> GetVirtualCollectionsUseCase {
-        GetVirtualCollectionsUseCase(collectionsRepository: collectionsRepository)
-    }
-    
-    func makeSaveSetupConfigurationUseCase() -> SaveSetupConfigurationUseCaseProtocol {
-        SaveSetupConfigurationUseCase(
-            setupRepository: setupRepository
+        SFTPDevicesViewModel(
+            getAllConnectionsUseCase: makeGetAllConnectionsUseCase(),
+            saveConnectionUseCase: makeSaveConnectionUseCase(),
+            deleteConnectionUseCase: makeDeleteConnectionUseCase(),
+            manageDefaultConnectionUseCase: makeManageDefaultConnectionUseCase(),
+            testConnectionUseCase: makeTestConnectionUseCase(),
+            checkConnectionStatusUseCase: makeCheckConnectionStatusUseCase(),
+            clearConnectionCacheUseCase: makeClearConnectionCacheUseCase()
         )
     }
     
-    func makeGetSetupConfigurationUseCase() -> GetSetupConfigurationUseCaseProtocol {
-        GetSetupConfigurationUseCase(setupRepository: setupRepository)
-    }
-    
-    func makeCheckSetupStatusUseCase() -> CheckSetupStatusUseCaseProtocol {
-        CheckSetupStatusUseCase(setupRepository: setupRepository)
-    }
-    
-    func makeClearSetupConfigurationUseCase() -> ClearSetupConfigurationUseCaseProtocol {
-        ClearSetupConfigurationUseCase(
-            setupRepository: setupRepository,
-            configurationService: DefaultConfigurationService.shared
+    @MainActor func makeSFTPDirectoryBrowserViewModel(connection: SFTPConnection) -> SFTPDirectoryBrowserViewModel {
+        SFTPDirectoryBrowserViewModel(
+            connection: connection,
+            listDirectoryUseCase: makeListDirectoryUseCase(),
+            manageFavoriteDirectoriesUseCase: makeManageFavoriteDirectoriesUseCase(),
+            createDirectoryUseCase: makeCreateSFTPDirectoryUseCase()
         )
     }
     
-    // MARK: - SFTP Use Cases
-    
-    func makeSFTPUseCases() -> SFTPUseCases {
-        SFTPUseCases(repository: sftpRepository, connectionManager: sftpConnectionManager)
-    }
-    
-    // MARK: - SFTP ViewModels
-    
-    @MainActor func makeSFTPDevicesViewModel() -> SFTPDevicesViewModel {
-        SFTPDevicesViewModel(sftpUseCases: makeSFTPUseCases())
-    }
-    
-    @MainActor func makeSFTPDirectoryBrowserViewModel(connection: SFTPConnection) -> SFTPDirectoryBrowserViewModel {
-        SFTPDirectoryBrowserViewModel(connection: connection, sftpUseCases: makeSFTPUseCases())
-    }
-    
     @MainActor func makeSFTPUploadViewModel(rom: Rom) -> SFTPUploadViewModel {
-        SFTPUploadViewModel(rom: rom, sftpUseCases: makeSFTPUseCases(), apiClient: apiClient)
+        SFTPUploadViewModel(
+            rom: rom,
+            apiClient: apiClient
+        )
     }
     
     @MainActor func makeAddEditSFTPDeviceViewModel(connection: SFTPConnection?) -> AddEditSFTPDeviceViewModel {
-        AddEditSFTPDeviceViewModel(connection: connection, sftpUseCases: makeSFTPUseCases())
+        AddEditSFTPDeviceViewModel(
+            connection: connection,
+            getCredentialsUseCase: makeGetCredentialsUseCase(),
+            testConnectionUseCase: makeTestConnectionUseCase()
+        )
     }
 }
