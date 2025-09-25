@@ -69,13 +69,7 @@ private struct AsyncImageLoader<Content: View, Placeholder: View>: View {
                 self.isLoading = false
                 switch result {
                 case .success(let value):
-                    self.loadedImage = value.image
-                    // Log cache hit/miss
-                    if value.cacheType == .disk {
-                        Logger.general.debug("🖼️ Image loaded from disk cache: \(url)")
-                    } else {
-                        Logger.general.debug("📥 Image downloaded and cached: \(url)")
-                    }
+                    self.loadedImage = value.image                    
                 case .failure(let error):
                     // Handle decompression errors by clearing cache and potentially retrying
                     if error.errorDescription?.contains("decompressing") == true || error.errorDescription?.contains("-17102") == true {

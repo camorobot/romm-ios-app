@@ -77,6 +77,10 @@ class MockDependencyFactory: DependencyFactoryProtocol {
         GetRomsUseCase(romsRepository: romsRepository)
     }
     
+    func makeGetRomsWithFiltersUseCase() -> GetRomsWithFiltersUseCase {
+        GetRomsWithFiltersUseCase(romsRepository: romsRepository)
+    }
+    
     func makeGetRomDetailsUseCase() -> GetRomDetailsUseCase {
         GetRomDetailsUseCase(romsRepository: romsRepository)
     }

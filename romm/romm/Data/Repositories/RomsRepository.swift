@@ -16,35 +16,23 @@ class RomsRepository: RomsRepositoryProtocol {
     }
     
     func getRoms(platformId: Int?, searchTerm: String?, limit: Int, offset: Int = 0, char: String? = nil, orderBy: String? = nil, orderDir: String? = nil, collectionId: Int? = nil) async throws -> PaginatedRomsResponse {
-        logger.info("🕹️ Getting ROMs - Platform: \(platformId?.description ?? "all"), Collection: \(collectionId?.description ?? "none"), Search: \(searchTerm ?? "none"), Limit: \(limit), Offset: \(offset), Char: \(char ?? "none")")
-        
-        var path = "api/roms?limit=\(limit)&offset=\(offset)"
-        
-        // Add sorting parameters
-        let finalOrderBy = orderBy ?? "name"
-        let finalOrderDir = orderDir ?? "asc"
-        path += "&order_by=\(finalOrderBy)&order_dir=\(finalOrderDir)&group_by_meta_id=true"
-        
-        if let platformId = platformId {
-            path += "&platform_id=\(platformId)"
-        }
-        
-        if let collectionId = collectionId {
-            path += "&collection_id=\(collectionId)"
-        }
-        
-        if let searchTerm = searchTerm, !searchTerm.isEmpty {
-            let encodedTerm = searchTerm.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            path += "&search=\(encodedTerm)"
-        }
-        
-        if let char = char, !char.isEmpty {
-            let encodedChar = char.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            path += "&char=\(encodedChar)"
-        }
+        // Keep the old implementation for backward compatibility 
+        // This uses OpenAPI but without filter parameters
+        logger.info("🕹️ Getting ROMs (legacy) - Platform: \(platformId?.description ?? "all"), Collection: \(collectionId?.description ?? "none"), Search: \(searchTerm ?? "none"), Limit: \(limit), Offset: \(offset), Char: \(char ?? "none")")
         
         do {
-            let romsPage = try await apiClient.get(path, responseType: CustomLimitOffsetPageSimpleRomSchema.self)
+            let romsPage = try await apiClient.getRomsWithFilters(
+                searchTerm: searchTerm,
+                platformId: platformId,
+                collectionId: collectionId,
+                limit: limit,
+                offset: offset,
+                withCharIndex: char != nil ? false : true,
+                orderBy: orderBy ?? "name",
+                orderDir: orderDir ?? "asc",
+                filters: .empty // No filter parameters - keep it simple
+            )
+            
             let domainRoms = romsPage.items.mapToDomain()
             
             let paginatedResponse = PaginatedRomsResponse(
@@ -59,6 +47,52 @@ class RomsRepository: RomsRepositoryProtocol {
             return paginatedResponse
         } catch {
             logger.error("❌ Error getting ROMs: \(error)")
+            throw RomError.networkError
+        }
+    }
+    
+    func getRomsWithFilters(
+        platformId: Int?,
+        searchTerm: String?,
+        limit: Int,
+        offset: Int = 0,
+        char: String? = nil,
+        orderBy: String? = nil,
+        orderDir: String? = nil,
+        collectionId: Int? = nil,
+        filters: RomFilters
+    ) async throws -> PaginatedRomsResponse {
+        logger.info("🕹️ Getting ROMs with filters - Platform: \(platformId?.description ?? "all"), Collection: \(collectionId?.description ?? "none"), Search: \(searchTerm ?? "none"), Limit: \(limit), Offset: \(offset), Char: \(char ?? "none")")
+        logger.info("🔧 Filters active: \(filters.hasActiveFilters)")
+        
+        do {
+            // Use the clean OpenAPI facade with RomFilters object
+            let romsPage = try await apiClient.getRomsWithFilters(
+                searchTerm: searchTerm,
+                platformId: platformId,
+                collectionId: collectionId,
+                limit: limit,
+                offset: offset,
+                withCharIndex: char != nil ? false : true, // Don't return char index when filtering by char
+                orderBy: orderBy ?? "name",
+                orderDir: orderDir ?? "asc",
+                filters: filters
+            )
+            
+            let domainRoms = romsPage.items.mapToDomain()
+            
+            let paginatedResponse = PaginatedRomsResponse(
+                roms: domainRoms,
+                total: romsPage.total ?? 0,
+                limit: romsPage.limit ?? limit,
+                offset: romsPage.offset ?? offset,
+                charIndex: romsPage.charIndex
+            )
+            
+            logger.info("✅ Retrieved \(domainRoms.count) filtered ROMs (Total: \(paginatedResponse.total), HasMore: \(paginatedResponse.hasMore))")
+            return paginatedResponse
+        } catch {
+            logger.error("❌ Error getting filtered ROMs: \(error)")
             throw RomError.networkError
         }
     }

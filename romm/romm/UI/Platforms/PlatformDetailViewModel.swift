@@ -39,6 +39,7 @@ class PlatformDetailViewModel {
     
     private let logger = Logger.viewModel
     private let romsUseCase: GetRomsUseCase
+    private let romsWithFiltersUseCase: GetRomsWithFiltersUseCase
     private let getViewModeUseCase: GetViewModeUseCaseProtocol
     private let saveViewModeUseCase: SaveViewModeUseCaseProtocol
     private var currentOffset = 0
@@ -52,6 +53,7 @@ class PlatformDetailViewModel {
     
     init(factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
         self.romsUseCase = factory.makeGetRomsUseCase()
+        self.romsWithFiltersUseCase = factory.makeGetRomsWithFiltersUseCase()
         self.getViewModeUseCase = factory.makeGetViewModeUseCase()
         self.saveViewModeUseCase = factory.makeSaveViewModeUseCase()
         loadViewMode()
@@ -239,6 +241,65 @@ class PlatformDetailViewModel {
         // Reload data with new sorting
         guard let platformId = currentPlatformId else { return }
         await loadRoms(for: platformId, refresh: true)
+    }
+    
+    func applyFilters(_ filterStates: FilterStates, platformId: Int) async {
+        logger.info("Applying filters to ROMs")
+        
+        let filters = RomFilters(
+            matched: filterStates.showMatched ? true : nil,
+            favourite: filterStates.showFavourites ? true : nil,
+            duplicate: filterStates.showDuplicates ? true : nil,
+            playable: nil,
+            missing: filterStates.showMissing ? true : nil,
+            hasRa: filterStates.showRetroAchievements ? true : nil,
+            verified: filterStates.showVerified ? true : nil,
+            selectedGenre: filterStates.selectedGenre,
+            selectedFranchise: filterStates.selectedFranchise,
+            selectedCollection: filterStates.selectedCollection,
+            selectedCompany: filterStates.selectedCompany,
+            selectedAgeRating: filterStates.selectedAgeRating,
+            selectedStatus: filterStates.selectedStatus,
+            selectedRegion: filterStates.selectedRegion,
+            selectedLanguage: filterStates.selectedLanguage
+        )
+        logger.debug("Filter states converted - hasActiveFilters: \(filters.hasActiveFilters)")
+        
+        viewState = .loading
+        charIndex = [:]
+        currentOffset = 0
+        hasMoreRoms = true
+        
+        do {
+            let response = try await romsWithFiltersUseCase.execute(
+                platformId: platformId,
+                searchTerm: nil,
+                limit: pageSize,
+                offset: 0,
+                char: nil,
+                orderBy: "name", // Use safe default instead of currentOrderBy
+                orderDir: "asc", // Use safe default instead of currentOrderDir
+                collectionId: nil,
+                filters: filters
+            )
+            
+            if response.roms.isEmpty {
+                viewState = .empty("No ROMs found matching your filters")
+            } else {
+                viewState = .loaded(response.roms)
+                lastLoadedRoms = response.roms
+            }
+            
+            charIndex = processCharIndex(response.charIndex)
+            hasMoreRoms = response.hasMore
+            totalRoms = response.total
+            currentOffset = response.offset + response.limit
+            
+            logger.info("Applied filters: \(response.roms.count) ROMs found (Total: \(totalRoms))")
+        } catch {
+            logger.error("Filter application failed: \(error)")
+            viewState = .error(error.localizedDescription)
+        }
     }
     
     func filterByChar(_ char: String?, platformId: Int) async {

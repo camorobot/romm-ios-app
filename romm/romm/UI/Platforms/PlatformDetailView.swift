@@ -14,14 +14,10 @@ struct PlatformDetailView: View {
     
     @State private var viewModel = PlatformDetailViewModel()
     
-    @State private var searchText = ""
     @State private var showingSortSheet = false
     
     // Filter state
-    @State private var selectedLanguages: Set<String> = []
-    @State private var selectedRegions: Set<String> = []
-    @State private var selectedStatus: Set<String> = []
-    @State private var releaseYearRange: ClosedRange<Int>? = nil
+    @State private var filterStates = FilterStates()
     
     // Check if custom sorting is active (not default name/asc)
     private var isCustomSortingActive: Bool {
@@ -30,7 +26,21 @@ struct PlatformDetailView: View {
     
     // Check if any filters are active
     private var isFilterActive: Bool {
-        !selectedLanguages.isEmpty || !selectedRegions.isEmpty || !selectedStatus.isEmpty || releaseYearRange != nil
+        filterStates.showUnmatched ||
+        filterStates.showMatched ||
+        filterStates.showFavourites ||
+        filterStates.showDuplicates ||
+        filterStates.showMissing ||
+        filterStates.showVerified ||
+        filterStates.showRetroAchievements ||
+        filterStates.selectedGenre != nil ||
+        filterStates.selectedFranchise != nil ||
+        filterStates.selectedCollection != nil ||
+        filterStates.selectedCompany != nil ||
+        filterStates.selectedAgeRating != nil ||
+        filterStates.selectedRegion != nil ||
+        filterStates.selectedLanguage != nil ||
+        filterStates.selectedStatus != nil
     }
     
     var body: some View {
@@ -42,7 +52,7 @@ struct PlatformDetailView: View {
                 if viewModel.hasLoadedRoms {
                     // Show content while refreshing in background
                     RomListWithSectionIndex(
-                        roms: filteredRoms(from: viewModel.lastLoadedRoms),
+                        roms: viewModel.lastLoadedRoms,
                         viewMode: viewModel.viewMode,
                         onRefresh: {
                             await viewModel.refreshRoms()
@@ -69,7 +79,7 @@ struct PlatformDetailView: View {
                 
             case .loaded(let roms), .loadingMore(let roms):
                 RomListWithSectionIndex(
-                    roms: filteredRoms(from: roms),
+                    roms: roms,
                     viewMode: viewModel.viewMode,
                     onRefresh: {
                         await viewModel.refreshRoms()
@@ -149,26 +159,22 @@ struct PlatformDetailView: View {
             let currentRoms = getCurrentRoms()
             let filterOptions = getAvailableFilterOptions(from: currentRoms)
             
-            SortOptionsSheet(
-                currentOrderBy: viewModel.currentOrderBy,
-                currentOrderDir: viewModel.currentOrderDir,
+            FilterView(
                 filterOptions: filterOptions,
-                selectedLanguages: $selectedLanguages,
-                selectedRegions: $selectedRegions,
-                selectedStatus: $selectedStatus,
-                releaseYearRange: $releaseYearRange,
-                onSortSelected: { orderBy, orderDir in
-                    
+                filterStates: $filterStates,
+                onReset: {
+                    filterStates = FilterStates()
+                    showingSortSheet = false // Close sheet first
                     Task {
-                        await viewModel.sortRoms(orderBy: orderBy, orderDir: orderDir)
+                        // Reset filters means load all ROMs without filters
+                        await viewModel.loadRoms(for: platform.id, refresh: true)
                     }
-                    showingSortSheet = false
                 },
-                onResetFilters: {
-                    selectedLanguages.removeAll()
-                    selectedRegions.removeAll()
-                    selectedStatus.removeAll()
-                    releaseYearRange = nil
+                onApply: {
+                    showingSortSheet = false // Close sheet first
+                    Task {
+                        await viewModel.applyFilters(filterStates, platformId: platform.id)
+                    }
                 }
             )
         }
@@ -182,48 +188,6 @@ struct PlatformDetailView: View {
         }
     }
     
-    private func filteredRoms(from roms: [Rom]) -> [Rom] {
-        var filtered = roms
-        
-        // Apply search text filter
-        if !searchText.isEmpty {
-            filtered = filtered.filter { rom in
-                rom.name.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-        
-        // Apply language filter
-        if !selectedLanguages.isEmpty {
-            filtered = filtered.filter { rom in
-                !rom.languages.isEmpty && Set(rom.languages).intersection(selectedLanguages).count > 0
-            }
-        }
-        
-        // Apply region filter
-        if !selectedRegions.isEmpty {
-            filtered = filtered.filter { rom in
-                !rom.regions.isEmpty && Set(rom.regions).intersection(selectedRegions).count > 0
-            }
-        }
-        
-        // Apply status filter
-        if !selectedStatus.isEmpty {
-            filtered = filtered.filter { rom in
-                let statusSet = getStatusSet(for: rom)
-                return statusSet.intersection(selectedStatus).count > 0
-            }
-        }
-        
-        // Apply release year filter
-        if let yearRange = releaseYearRange {
-            filtered = filtered.filter { rom in
-                guard let year = rom.releaseYear else { return false }
-                return yearRange.contains(year)
-            }
-        }
-        
-        return filtered
-    }
     
     private func getStatusSet(for rom: Rom) -> Set<String> {
         var statuses: Set<String> = []
@@ -244,26 +208,34 @@ struct PlatformDetailView: View {
     }
     
     private func getAvailableFilterOptions(from roms: [Rom]) -> FilterOptions {
+        var genres: Set<String> = []
+        var franchises: Set<String> = []
+        var companies: Set<String> = []
+        var ageRatings: Set<String> = []
         var languages: Set<String> = []
         var regions: Set<String> = []
         var statuses: Set<String> = []
-        var years: Set<Int> = []
         
+        // Extract all available data from the ROM model
         for rom in roms {
+            genres.formUnion(rom.genres)
+            franchises.formUnion(rom.franchises)
+            companies.formUnion(rom.companies)
+            ageRatings.formUnion(rom.ageRatings)
             languages.formUnion(rom.languages)
             regions.formUnion(rom.regions)
             statuses.formUnion(getStatusSet(for: rom))
-            
-            if let year = rom.releaseYear {
-                years.insert(year)
-            }
         }
         
         return FilterOptions(
-            languages: Array(languages).sorted(),
+            genres: Array(genres).sorted(),
+            franchises: Array(franchises).sorted(),
+            collections: [], // Collections not available in ROM model yet
+            companies: Array(companies).sorted(),
+            ageRatings: Array(ageRatings).sorted(),
             regions: Array(regions).sorted(),
-            statuses: Array(statuses).sorted(),
-            releaseYears: Array(years).sorted()
+            languages: Array(languages).sorted(),
+            statuses: Array(statuses).sorted()
         )
     }
     
@@ -525,349 +497,6 @@ struct PlatformErrorView: View {
     }
 }
 
-// MARK: - Filter Options Data Structure
-struct FilterOptions {
-    let languages: [String]
-    let regions: [String]
-    let statuses: [String]
-    let releaseYears: [Int]
-}
-
-// MARK: - Sort Options Sheet
-struct SortOptionsSheet: View {
-    let currentOrderBy: String
-    let currentOrderDir: String
-    let filterOptions: FilterOptions
-    @Binding var selectedLanguages: Set<String>
-    @Binding var selectedRegions: Set<String>
-    @Binding var selectedStatus: Set<String>
-    @Binding var releaseYearRange: ClosedRange<Int>?
-    let onSortSelected: (String, String) -> Void
-    let onResetFilters: () -> Void
-    
-    @Environment(\.dismiss) private var dismiss
-    
-    private var isResetAvailable: Bool {
-        currentOrderBy != "name" || currentOrderDir != "asc"
-    }
-    
-    private var isFiltersActive: Bool {
-        !selectedLanguages.isEmpty || !selectedRegions.isEmpty || !selectedStatus.isEmpty || releaseYearRange != nil
-    }
-    
-    private let sortOptions: [(field: SortField, displayName: String)] = [
-        (.name, "Title"),
-        (.size, "Size"),
-        (.added, "Added"),
-        (.released, "Released"),
-        (.rating, "Rating")
-    ]
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                List {
-                    Section("Sort Options") {
-                        ForEach(sortOptions, id: \.field.rawValue) { option in
-                            SortOptionRow(
-                                title: option.displayName,
-                                field: option.field,
-                                currentOrderBy: currentOrderBy,
-                                currentOrderDir: currentOrderDir,
-                                onSelected: onSortSelected
-                            )
-                        }
-                    }
-                    
-                    Section("Filter Options") {
-                        // Language Filter
-                        if !filterOptions.languages.isEmpty {
-                            FilterRow(
-                                title: "Language",
-                                options: filterOptions.languages,
-                                selectedOptions: $selectedLanguages,
-                                icon: "globe"
-                            )
-                        }
-                        
-                        // Region Filter
-                        if !filterOptions.regions.isEmpty {
-                            FilterRow(
-                                title: "Region",
-                                options: filterOptions.regions,
-                                selectedOptions: $selectedRegions,
-                                icon: "flag"
-                            )
-                        }
-                        
-                        // Status Filter
-                        if !filterOptions.statuses.isEmpty {
-                            FilterRow(
-                                title: "Status",
-                                options: filterOptions.statuses,
-                                selectedOptions: $selectedStatus,
-                                icon: "star"
-                            )
-                        }
-                        
-                        // Release Year Filter
-                        if !filterOptions.releaseYears.isEmpty {
-                            ReleaseYearFilterRow(
-                                availableYears: filterOptions.releaseYears,
-                                selectedRange: $releaseYearRange
-                            )
-                        }
-                    }
-                }
-                
-                // Bottom button section
-                VStack(spacing: 12) {
-                    Divider()
-                    
-                    HStack(spacing: 16) {
-                        // Reset button
-                        Button("Reset to Default") {
-                            onSortSelected("name", "asc")
-                            onResetFilters()
-                        }
-                        .frame(maxWidth: .infinity)
-                        .buttonStyle(.bordered)
-                        .foregroundColor(.red)
-                        .disabled(!isResetAvailable && !isFiltersActive)
-                        
-                        // Done button
-                        Button("Done") {
-                            dismiss()
-                        }
-                        .frame(maxWidth: .infinity)
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-                .padding(.top, 8)
-                .background(Color(.systemBackground))
-            }
-            .navigationTitle("Sort & Filter")
-            .navigationBarTitleDisplayMode(.large)
-        }
-    }
-}
-
-struct SortOptionRow: View {
-    let title: String
-    let field: SortField
-    let currentOrderBy: String
-    let currentOrderDir: String
-    let onSelected: (String, String) -> Void
-    
-    private var isSelected: Bool {
-        field.rawValue == currentOrderBy
-    }
-    
-    private var currentDirection: SortDirection {
-        SortDirection(rawValue: currentOrderDir) ?? .asc
-    }
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.body)
-                    .fontWeight(isSelected ? .semibold : .regular)
-                
-                if isSelected {
-                    Text(currentDirection == .asc ? "Ascending" : "Descending")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 12) {
-                // Ascending button
-                Button(action: {
-                    onSelected(field.rawValue, SortDirection.asc.rawValue)
-                }) {
-                    Image(systemName: "chevron.up")
-                        .foregroundColor(isSelected && currentDirection == .asc ? .blue : .secondary)
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .buttonStyle(.plain)
-                
-                // Descending button  
-                Button(action: {
-                    onSelected(field.rawValue, SortDirection.desc.rawValue)
-                }) {
-                    Image(systemName: "chevron.down")
-                        .foregroundColor(isSelected && currentDirection == .desc ? .blue : .secondary)
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            let newDirection = isSelected && currentDirection == .asc ? SortDirection.desc : SortDirection.asc
-            onSelected(field.rawValue, newDirection.rawValue)
-        }
-    }
-}
-
-// MARK: - Filter Row Component
-struct FilterRow: View {
-    let title: String
-    let options: [String]
-    @Binding var selectedOptions: Set<String>
-    let icon: String
-    
-    var body: some View {
-        NavigationLink {
-            FilterSelectionView(
-                title: title,
-                options: options,
-                selectedOptions: $selectedOptions
-            )
-        } label: {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundColor(.blue)
-                    .font(.system(size: 16, weight: .medium))
-                    .frame(width: 20)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body)
-                    
-                    if !selectedOptions.isEmpty {
-                        Text("\(selectedOptions.count) selected")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("All")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Spacer()
-                
-                if !selectedOptions.isEmpty {
-                    Text("\(selectedOptions.count)")
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.blue)
-                        .clipShape(Capsule())
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Release Year Filter Row
-struct ReleaseYearFilterRow: View {
-    let availableYears: [Int]
-    @Binding var selectedRange: ClosedRange<Int>?
-    
-    private var minYear: Int {
-        availableYears.min() ?? 1980
-    }
-    
-    private var maxYear: Int {
-        availableYears.max() ?? Calendar.current.component(.year, from: Date())
-    }
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "calendar")
-                .foregroundColor(.blue)
-                .font(.system(size: 16, weight: .medium))
-                .frame(width: 20)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Release Year")
-                    .font(.body)
-                
-                if let range = selectedRange {
-                    Text("\(range.lowerBound) - \(range.upperBound)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("All years")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Spacer()
-            
-            Button(selectedRange == nil ? "Set Range" : "Clear") {
-                if selectedRange == nil {
-                    selectedRange = minYear...maxYear
-                } else {
-                    selectedRange = nil
-                }
-            }
-            .font(.caption)
-            .foregroundColor(.blue)
-        }
-    }
-}
-
-// MARK: - Filter Selection View
-struct FilterSelectionView: View {
-    let title: String
-    let options: [String]
-    @Binding var selectedOptions: Set<String>
-    
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            List {
-                ForEach(options, id: \.self) { option in
-                    HStack {
-                        Text(option)
-                        Spacer()
-                        if selectedOptions.contains(option) {
-                            Image(systemName: "checkmark")
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        if selectedOptions.contains(option) {
-                            selectedOptions.remove(option)
-                        } else {
-                            selectedOptions.insert(option)
-                        }
-                    }
-                }
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                }
-                
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Clear All") {
-                        selectedOptions.removeAll()
-                    }
-                    .foregroundColor(.red)
-                    .disabled(selectedOptions.isEmpty)
-                }
-            }
-        }
-    }
-}
 
 #Preview {
     NavigationStack {

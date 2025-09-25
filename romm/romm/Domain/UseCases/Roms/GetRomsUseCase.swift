@@ -18,3 +18,35 @@ class GetRomsUseCase {
         return try await romsRepository.getRoms(platformId: platformId, searchTerm: searchTerm, limit: limit, offset: offset, char: char, orderBy: orderBy, orderDir: orderDir, collectionId: collectionId)
     }
 }
+
+class GetRomsWithFiltersUseCase {
+    private let romsRepository: RomsRepositoryProtocol
+    
+    init(romsRepository: RomsRepositoryProtocol) {
+        self.romsRepository = romsRepository
+    }
+    
+    func execute(
+        platformId: Int? = nil, 
+        searchTerm: String? = nil, 
+        limit: Int = 50, 
+        offset: Int = 0, 
+        char: String? = nil, 
+        orderBy: String? = nil, 
+        orderDir: String? = nil, 
+        collectionId: Int? = nil,
+        filters: RomFilters = .empty
+    ) async throws -> PaginatedRomsResponse {
+        return try await romsRepository.getRomsWithFilters(
+            platformId: platformId, 
+            searchTerm: searchTerm, 
+            limit: limit, 
+            offset: offset, 
+            char: char, 
+            orderBy: orderBy, 
+            orderDir: orderDir, 
+            collectionId: collectionId,
+            filters: filters
+        )
+    }
+}

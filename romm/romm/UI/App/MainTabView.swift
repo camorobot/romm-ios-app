@@ -17,44 +17,34 @@ struct MainTabView: View {
     
     var body: some View {
         TabView {
-            NavigationStack {
-                PlatformsView()
-            }
-            .tabItem {
-                Image(systemName: "gamecontroller")
-                Text("Plattforms")
+            Tab("Platforms", systemImage: "gamecontroller") {
+                NavigationStack {
+                    PlatformsView()
+                }
             }
             
-            NavigationStack {
-                CollectionView()
-            }
-            .tabItem {
-                Image(systemName: "books.vertical")
-                Text("Collection")
+            Tab("Collection", systemImage: "books.vertical") {
+                NavigationStack {
+                    CollectionView()
+                }
             }
             
-            NavigationStack {
-                SearchView(dependencyFactory: dependencyFactory)
-            }
-            .tabItem {
-                Image(systemName: "magnifyingglass")
-                Text("Suche")
+            Tab("Devices", systemImage: "server.rack") {
+                NavigationStack {
+                    SFTPDevicesView(dependencyFactory: dependencyFactory)
+                }
             }
             
-            NavigationStack {
-                SFTPDevicesView(dependencyFactory: dependencyFactory)
+            Tab("Settings", systemImage: "gear") {
+                NavigationStack {
+                    SettingsView()
+                }
             }
-            .tabItem {
-                Image(systemName: "server.rack")
-                Text("Devices")
-            }
-            
-            NavigationStack {
-                ProfileView()
-            }
-            .tabItem {
-                Image(systemName: "person.circle")
-                Text("Profil")
+
+            Tab("Search", systemImage: "magnifyingglass", role: .search) {
+                NavigationStack {
+                    SearchView(dependencyFactory: dependencyFactory)
+                }
             }
         }
     }

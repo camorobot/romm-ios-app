@@ -26,6 +26,31 @@ struct RomMapper {
             }
         }()
         
+        // Aggregate metadata from all available sources
+        let genres: [String] = aggregateMetadataArray([
+            apiRom.metadatum.genres,
+            apiRom.igdbMetadata?.genres,
+            apiRom.ssMetadata?.genres,
+            apiRom.mobyMetadata?.genres
+        ])
+        
+        let franchises: [String] = aggregateMetadataArray([
+            apiRom.metadatum.franchises,
+            apiRom.igdbMetadata?.franchises,
+            apiRom.ssMetadata?.franchises
+        ])
+        
+        let companies: [String] = aggregateMetadataArray([
+            apiRom.metadatum.companies,
+            apiRom.igdbMetadata?.companies,
+            apiRom.ssMetadata?.companies
+        ])
+        
+        let ageRatings: [String] = aggregateAgeRatings(
+            metadatumRatings: apiRom.metadatum.ageRatings,
+            igdbRatings: apiRom.igdbMetadata?.ageRatings
+        )
+        
         return Rom(
             id: apiRom.id,
             name: apiRom.name ?? "Unknown ROM",
@@ -43,7 +68,11 @@ struct RomMapper {
             languages: apiRom.languages,
             regions: apiRom.regions,
             fileName: apiRom.files.first?.fileName ?? "",
-            platformSlug: apiRom.platformSlug
+            platformSlug: apiRom.platformSlug,
+            genres: genres,
+            franchises: franchises,
+            companies: companies,
+            ageRatings: ageRatings
         )
     }
     

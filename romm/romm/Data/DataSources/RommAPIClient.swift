@@ -23,6 +23,25 @@ protocol RommAPIClientProtocol {
     func getManualPDFData(manualURL: String) async throws -> Data
     func getRomDetails(id: Int) async throws -> DetailedRomSchema
     
+    // ROM API Wrapper methods
+    func getRoms(
+        searchTerm: String?,
+        platformId: Int?,
+        limit: Int
+    ) async throws -> CustomLimitOffsetPageSimpleRomSchema
+    
+    func getRomsWithFilters(
+        searchTerm: String?,
+        platformId: Int?,
+        collectionId: Int?,
+        limit: Int,
+        offset: Int?,
+        withCharIndex: Bool?,
+        orderBy: String?,
+        orderDir: String?,
+        filters: RomFilters
+    ) async throws -> CustomLimitOffsetPageSimpleRomSchema
+    
     // ROM Search API Wrapper methods
     func searchRomsWithOpenAPI(query: String) async throws -> CustomLimitOffsetPageSimpleRomSchema
     
@@ -304,6 +323,7 @@ extension RommAPIClient {
 
 // MARK: - ROMs API Wrapper
 extension RommAPIClient {
+    // Keep the simple version for backward compatibility
     func getRoms(
         searchTerm: String? = nil,
         platformId: Int? = nil,
@@ -313,6 +333,46 @@ extension RommAPIClient {
             searchTerm: searchTerm,
             platformId: platformId,
             limit: limit
+        )
+    }
+    
+    // Clean version with RomFilters object
+    func getRomsWithFilters(
+        searchTerm: String? = nil,
+        platformId: Int? = nil,
+        collectionId: Int? = nil,
+        limit: Int = 50,
+        offset: Int? = nil,
+        withCharIndex: Bool? = nil,
+        orderBy: String? = nil,
+        orderDir: String? = nil,
+        filters: RomFilters
+    ) async throws -> CustomLimitOffsetPageSimpleRomSchema {
+        return try await RomsAPI.getRomsApiRomsGet(
+            withCharIndex: withCharIndex,
+            searchTerm: searchTerm,
+            platformId: platformId,
+            collectionId: collectionId,
+            matched: filters.matched,
+            favourite: filters.favourite,
+            duplicate: filters.duplicate,
+            playable: filters.playable,
+            missing: filters.missing,
+            hasRa: filters.hasRa,
+            verified: filters.verified,
+            groupByMetaId: true, // Always group by meta ID like the old implementation
+            selectedGenre: filters.selectedGenre,
+            selectedFranchise: filters.selectedFranchise,
+            selectedCollection: filters.selectedCollection,
+            selectedCompany: filters.selectedCompany,
+            selectedAgeRating: filters.selectedAgeRating,
+            selectedStatus: filters.selectedStatus,
+            selectedRegion: filters.selectedRegion,
+            selectedLanguage: filters.selectedLanguage,
+            orderBy: orderBy,
+            orderDir: orderDir,
+            limit: limit,
+            offset: offset
         )
     }
     

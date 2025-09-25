@@ -28,6 +28,7 @@ protocol DependencyFactoryProtocol {
     func makeLogoutUseCase() -> LogoutUseCase
     func makeGetCurrentUserUseCase() -> GetCurrentUserUseCase
     func makeGetRomsUseCase() -> GetRomsUseCase
+    func makeGetRomsWithFiltersUseCase() -> GetRomsWithFiltersUseCase
     func makeGetRomDetailsUseCase() -> GetRomDetailsUseCase
     func makeToggleRomFavoriteUseCase() -> ToggleRomFavoriteUseCase
     func makeCheckRomFavoriteStatusUseCase() -> CheckRomFavoriteStatusUseCase
@@ -116,6 +117,10 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     
     func makeGetRomsUseCase() -> GetRomsUseCase {
         GetRomsUseCase(romsRepository: romsRepository)
+    }
+    
+    func makeGetRomsWithFiltersUseCase() -> GetRomsWithFiltersUseCase {
+        GetRomsWithFiltersUseCase(romsRepository: romsRepository)
     }
     
     func makeGetRomDetailsUseCase() -> GetRomDetailsUseCase {

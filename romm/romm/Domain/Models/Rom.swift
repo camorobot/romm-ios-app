@@ -52,6 +52,12 @@ struct Rom: Identifiable, Equatable {
     let fileName: String?
     let platformSlug: String?
     
+    // Filter-relevant metadata fields
+    let genres: [String]
+    let franchises: [String]
+    let companies: [String]
+    let ageRatings: [String]
+    
     var platform: Platform? = nil
     
     init(
@@ -71,7 +77,11 @@ struct Rom: Identifiable, Equatable {
         languages: [String] = [],
         regions: [String] = [],
         fileName: String? = nil,
-        platformSlug: String? = nil
+        platformSlug: String? = nil,
+        genres: [String] = [],
+        franchises: [String] = [],
+        companies: [String] = [],
+        ageRatings: [String] = []
     ) {
         self.id = id
         self.name = name
@@ -90,6 +100,10 @@ struct Rom: Identifiable, Equatable {
         self.regions = regions
         self.fileName = fileName
         self.platformSlug = platformSlug
+        self.genres = genres
+        self.franchises = franchises
+        self.companies = companies
+        self.ageRatings = ageRatings
     }
 }
 
@@ -178,4 +192,83 @@ struct RomDetails: Identifiable, Equatable {
         self.platformDisplayName = platformDisplayName
         self.siblings = siblings
     }
+}
+
+// MARK: - ROM Filter Parameters
+struct RomFilters {
+    // Toggle filters
+    let matched: Bool?
+    let favourite: Bool?
+    let duplicate: Bool?
+    let playable: Bool?
+    let missing: Bool?
+    let hasRa: Bool?
+    let verified: Bool?
+    
+    // Selection filters
+    let selectedGenre: String?
+    let selectedFranchise: String?
+    let selectedCollection: String?
+    let selectedCompany: String?
+    let selectedAgeRating: String?
+    let selectedStatus: String?
+    let selectedRegion: String?
+    let selectedLanguage: String?
+    
+    init(
+        matched: Bool? = nil,
+        favourite: Bool? = nil,
+        duplicate: Bool? = nil,
+        playable: Bool? = nil,
+        missing: Bool? = nil,
+        hasRa: Bool? = nil,
+        verified: Bool? = nil,
+        selectedGenre: String? = nil,
+        selectedFranchise: String? = nil,
+        selectedCollection: String? = nil,
+        selectedCompany: String? = nil,
+        selectedAgeRating: String? = nil,
+        selectedStatus: String? = nil,
+        selectedRegion: String? = nil,
+        selectedLanguage: String? = nil
+    ) {
+        self.matched = matched
+        self.favourite = favourite
+        self.duplicate = duplicate
+        self.playable = playable
+        self.missing = missing
+        self.hasRa = hasRa
+        self.verified = verified
+        self.selectedGenre = selectedGenre
+        self.selectedFranchise = selectedFranchise
+        self.selectedCollection = selectedCollection
+        self.selectedCompany = selectedCompany
+        self.selectedAgeRating = selectedAgeRating
+        self.selectedStatus = selectedStatus
+        self.selectedRegion = selectedRegion
+        self.selectedLanguage = selectedLanguage
+    }
+    
+    
+    // Check if any filters are active
+    var hasActiveFilters: Bool {
+        return matched != nil ||
+               favourite != nil ||
+               duplicate != nil ||
+               playable != nil ||
+               missing != nil ||
+               hasRa != nil ||
+               verified != nil ||
+               selectedGenre != nil ||
+               selectedFranchise != nil ||
+               selectedCollection != nil ||
+               selectedCompany != nil ||
+               selectedAgeRating != nil ||
+               selectedStatus != nil ||
+               selectedRegion != nil ||
+               selectedLanguage != nil
+    }
+    
+    // Empty filters (no filtering applied)
+    static let empty = RomFilters()
 }

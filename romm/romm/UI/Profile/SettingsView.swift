@@ -1,5 +1,5 @@
 //
-//  ProfileView.swift
+//  SettingsView.swift
 //  romm
 //
 //  Created by Ilyas Hallak on 07.08.25.
@@ -8,18 +8,26 @@
 import SwiftUI
 import os
 
-struct ProfileView: View {
+struct SettingsView: View {
     private let logger = Logger.ui
     @EnvironmentObject var appData: AppData
     @State private var profileViewModel = ProfileViewModel()
     @State private var showingLogoutAlert = false
     @State private var showingResetAlert = false
     
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+    }
+    
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+    
     var body: some View {
         List {
             // User Section
             if let user = appData.currentUser {
-                Section("User Information") {
+                Section("User") {
                     HStack {
                         Image(systemName: "person.circle.fill")
                             .font(.system(size: 40))
@@ -35,16 +43,26 @@ struct ProfileView: View {
                         }
                     }
                     .padding(.vertical, 8)
+                    
+                    Button(action: {
+                        showingLogoutAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                            Text("Logout")
+                        }
+                        .foregroundColor(.red)
+                    }
                 }
             }
             
-            // Configuration Section
-            Section("Configuration") {
-                if let config = appData.currentConfiguration {
+            // Server Section
+            if let config = appData.currentConfiguration {
+                Section("Server") {
                     HStack {
                         Image(systemName: "server.rack")
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Server")
+                            Text("Server URL")
                             Text(config.serverURL)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -61,27 +79,20 @@ struct ProfileView: View {
                         }
                     }
                     
-                    HStack {
-                        Image(systemName: "calendar")
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Setup Date")
-                            Text("Recently configured")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                    Button(action: {
+                        showingResetAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Reset Configuration")
                         }
-                    }
-                    
-                    HStack {
-                        Image(systemName: "app.badge")
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Setup Version")
-                            Text("1.0.0")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                        .foregroundColor(.orange)
                     }
                 }
-                
+            }
+            
+            // App Settings Section
+            Section("App Settings") {
                 NavigationLink(destination: LoggingConfigurationView()) {
                     HStack {
                         Image(systemName: "doc.text.magnifyingglass")
@@ -95,55 +106,9 @@ struct ProfileView: View {
                         Text("Image Cache Settings")
                     }
                 }
-                
-                Button(action: {
-                    showingResetAlert = true
-                }) {
-                    HStack {
-                        Image(systemName: "arrow.clockwise")
-                        Text("Reset Configuration")
-                    }
-                    .foregroundColor(.orange)
-                }
-            }
-            
-            // Actions Section
-            Section("Actions") {
-                Button(action: {
-                    showingLogoutAlert = true
-                }) {
-                    HStack {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                        Text("Logout")
-                    }
-                    .foregroundColor(.red)
-                }
-            }
-            
-            // App Information Section
-            Section("App Information") {
-                HStack {
-                    Image(systemName: "info.circle")
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Version")
-                        Text("1.0.0")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                HStack {
-                    Image(systemName: "gamecontroller.fill")
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("RomM Client")
-                        Text("iOS ROM Management")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
             }
         }
-        .navigationTitle("Profil")
+        .navigationTitle("Settings")
         .alert("Logout", isPresented: $showingLogoutAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Logout", role: .destructive) {
@@ -160,6 +125,28 @@ struct ProfileView: View {
         } message: {
             Text("This will reset all configuration settings and return you to the setup screen.")
         }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 4) {
+                Text("v\(appVersion) (\(buildNumber))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                HStack(spacing: 4) {
+                    Text("From Bremen with")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("♥")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+                
+                Link("Ilyas Hallak", destination: URL(string: "https://ilyashallak.de")!)
+                    .font(.caption)
+                    .foregroundColor(.blue)
+            }
+            .padding()
+            .background(Color(.systemBackground))
+        }
     }
     
     private func resetConfiguration() {
@@ -173,6 +160,6 @@ struct ProfileView: View {
 }
 
 #Preview {
-    ProfileView()
+    SettingsView()
         .environmentObject(AppData())
 }
