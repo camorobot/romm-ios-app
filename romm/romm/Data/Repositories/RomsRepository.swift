@@ -237,7 +237,26 @@ class RomsRepository: RomsRepositoryProtocol {
             return isFavorite
         } catch {
             logger.error("❌ Error checking ROM favorite status: \(error)")
+            logger.error("❌ Error details: \(String(describing: error))")
+            
+            // Check for specific error types to provide better logging
+            if let apiError = error as? APIClientError {
+                switch apiError {
+                case .invalidResponse(let code, let message):
+                    logger.error("❌ API returned status \(code): \(message)")
+                case .networkError(let networkError):
+                    logger.error("❌ Network error: \(networkError.localizedDescription)")
+                case .noConfiguration:
+                    logger.error("❌ No API configuration found")
+                case .noCredentials:
+                    logger.error("❌ No credentials available")
+                default:
+                    logger.error("❌ Other API error: \(apiError)")
+                }
+            }
+            
             // If we can't check favorites, assume false rather than throwing
+            // This prevents crashes in the UI
             return false
         }
     }

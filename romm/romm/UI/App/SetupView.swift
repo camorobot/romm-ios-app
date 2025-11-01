@@ -9,9 +9,9 @@ import SwiftUI
 
 struct SetupView: View {
     let appViewModel: AppViewModel
-    @State private var serverURL = "https://romm.mnk.any64.de"
-    @State private var username = "admin"
-    @State private var password = "diggah"
+    @State private var serverURL = ""
+    @State private var username = ""
+    @State private var password = ""
     
     var body: some View {
         NavigationView {
@@ -41,11 +41,14 @@ struct SetupView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Server URL")
                             .font(.headline)
-                        TextField("https://your-server.com", text: $serverURL)
+                        TextField("http://192.168.1.100", text: $serverURL)
                             .textFieldStyle(.roundedBorder)
                             .textContentType(.URL)
                             .autocapitalization(.none)
                             .keyboardType(.URL)
+                        Text("Examples: http://192.168.1.100 or https://romm.example.com")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {

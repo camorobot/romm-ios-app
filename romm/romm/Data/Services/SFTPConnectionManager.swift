@@ -25,6 +25,7 @@ func withTimeout<T>(_ timeout: TimeInterval, operation: @escaping () async throw
     }
 }
 
+@MainActor
 class SFTPConnectionManager: ObservableObject {
     static let shared = SFTPConnectionManager()
     

@@ -96,6 +96,12 @@ class RommAPIClient: RommAPIClientProtocol {
     private let urlSession: URLSession
     private let logger = Logger.network
     
+    // Cache for configuration to avoid repeated setup
+    private var cachedBaseURL: String?
+    private var cachedUsername: String?
+    private var cachedPassword: String?
+    private var isConfigured = false
+    
     init(tokenProvider: TokenProviderProtocol = TokenProvider(),
          urlSession: URLSession = URLSession.shared) {
         self.tokenProvider = tokenProvider
@@ -104,15 +110,34 @@ class RommAPIClient: RommAPIClientProtocol {
     }
     
     private func setupAPIConfiguration() {
-        // Update base URL from token provider when available
-        if let baseURL = tokenProvider.getServerURL() {
-            rommAPI.basePath = baseURL
+        // Get current values
+        let currentBaseURL = tokenProvider.getServerURL()
+        let currentUsername = tokenProvider.getUsername()
+        let currentPassword = tokenProvider.getPassword()
+        
+        // Check if configuration has changed or if this is first setup
+        let hasChanged = currentBaseURL != cachedBaseURL ||
+                       currentUsername != cachedUsername ||
+                       currentPassword != cachedPassword ||
+                       !isConfigured
+        
+        guard hasChanged else {
+            // Configuration unchanged, skip setup
+            return
         }
         
-        // Setup authentication for OpenAPI generated clients
-        if let username = tokenProvider.getUsername(),
-           let password = tokenProvider.getPassword() {
-            
+        logger.debug("🔄 API configuration changed, updating...")
+        
+        // Update base URL if available and changed
+        if let baseURL = currentBaseURL {
+            rommAPI.basePath = baseURL
+            logger.debug("✅ OpenAPI base URL updated: \(baseURL)")
+        } else {
+            logger.warning("⚠️ No server URL available for OpenAPI clients")
+        }
+        
+        // Setup authentication if credentials are available
+        if let username = currentUsername, let password = currentPassword {
             // Create Basic Auth header
             let loginString = "\(username):\(password)"
             if let loginData = loginString.data(using: .utf8) {
@@ -121,12 +146,29 @@ class RommAPIClient: RommAPIClientProtocol {
                 // Set authentication headers for OpenAPI clients
                 rommAPI.customHeaders["Authorization"] = "Basic \(base64LoginString)"
                 
-                
-                logger.debug("✅ OpenAPI authentication configured for user: \(username)")
+                logger.debug("✅ OpenAPI authentication updated for user: \(username)")
+            } else {
+                logger.error("❌ Failed to encode login data")
             }
         } else {
             logger.warning("⚠️ No authentication credentials available for OpenAPI clients")
         }
+        
+        // Update cache
+        cachedBaseURL = currentBaseURL
+        cachedUsername = currentUsername
+        cachedPassword = currentPassword
+        isConfigured = true
+    }
+    
+    // Force refresh of configuration (useful after login/logout)
+    func invalidateConfiguration() {
+        logger.debug("🔄 Configuration cache invalidated")
+        cachedBaseURL = nil
+        cachedUsername = nil
+        cachedPassword = nil
+        isConfigured = false
+        setupAPIConfiguration()
     }
     
     

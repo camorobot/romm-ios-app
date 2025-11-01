@@ -42,6 +42,7 @@ private struct AsyncImageLoader<Content: View, Placeholder: View>: View {
                 placeholder()
             }
         }
+        .animation(.none, value: loadedImage)
         .onAppear {
             loadImage()
         }
@@ -56,12 +57,13 @@ private struct AsyncImageLoader<Content: View, Placeholder: View>: View {
         
         isLoading = true
         
-        // Use KingFisher with our optimized cache settings
         let options: KingfisherOptionsInfo = [
             .diskCacheExpiration(.days(30)),
             .backgroundDecode,
             .scaleFactor(UIScreen.main.scale),
-            .retryStrategy(DelayRetryStrategy(maxRetryCount: 1, retryInterval: .seconds(1)))
+            .processor(DownsamplingImageProcessor(size: CGSize(width: 300, height: 300))),
+            .retryStrategy(DelayRetryStrategy(maxRetryCount: 2, retryInterval: .seconds(0.5))),
+            .loadDiskFileSynchronously
         ]
         
         KingfisherManager.shared.retrieveImage(with: url, options: options) { result in

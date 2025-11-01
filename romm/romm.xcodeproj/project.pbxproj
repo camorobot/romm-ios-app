@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		5D2B9D042E5BA8C200F5233E /* mft.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5D2B9D032E5BA8C200F5233E /* mft.xcframework */; };
-		5D2B9D052E5BA8C200F5233E /* mft.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 5D2B9D032E5BA8C200F5233E /* mft.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		5D7501352E97A35300DAE612 /* mft.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5D2B9D032E5BA8C200F5233E /* mft.xcframework */; };
+		5D7501362E97A35300DAE612 /* mft.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 5D2B9D032E5BA8C200F5233E /* mft.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		5D9D918E2E5F8F21009AF769 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 5D9D918D2E5F8F21009AF769 /* Kingfisher */; };
 /* End PBXBuildFile section */
 
@@ -30,13 +30,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		5D2B9D062E5BA8C200F5233E /* Embed Frameworks */ = {
+		5D7501372E97A35300DAE612 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				5D2B9D052E5BA8C200F5233E /* mft.xcframework in Embed Frameworks */,
+				5D7501362E97A35300DAE612 /* mft.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -44,7 +44,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		5D2B9D032E5BA8C200F5233E /* mft.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = mft.xcframework; path = "../../mft 2025-08-24 21-54-12/mft.xcframework"; sourceTree = "<group>"; };
+		5D2B9D032E5BA8C200F5233E /* mft.xcframework */ = {isa = PBXFileReference; expectedSignature = "AppleDeveloperProgram:8J69P655GN:Ilyas Hallak"; lastKnownFileType = wrapper.xcframework; name = mft.xcframework; path = "../../mft 2025-08-24 21-54-12/mft.xcframework"; sourceTree = "<group>"; };
 		5DA7E4202E43D870003680D9 /* romm.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = romm.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5DA7E4332E43D872003680D9 /* rommTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rommTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5DA7E43D2E43D872003680D9 /* rommUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rommUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -87,7 +87,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5D9D918E2E5F8F21009AF769 /* Kingfisher in Frameworks */,
-				5D2B9D042E5BA8C200F5233E /* mft.xcframework in Frameworks */,
+				5D7501352E97A35300DAE612 /* mft.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -147,7 +147,7 @@
 				5DA7E41C2E43D870003680D9 /* Sources */,
 				5DA7E41D2E43D870003680D9 /* Frameworks */,
 				5DA7E41E2E43D870003680D9 /* Resources */,
-				5D2B9D062E5BA8C200F5233E /* Embed Frameworks */,
+				5D7501372E97A35300DAE612 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -442,7 +442,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = romm/romm.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 8J69P655GN;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -472,7 +472,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
@@ -485,7 +485,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = romm/romm.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 8J69P655GN;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -515,7 +515,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
