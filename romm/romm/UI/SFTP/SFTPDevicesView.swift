@@ -9,13 +9,7 @@ struct SFTPDevicesView: View {
     }
     
     var body: some View {
-        VStack {
-            if viewModel.connections.isEmpty && !viewModel.isLoading {
-                emptyStateView
-            } else {
-                devicesList
-            }
-        }
+        devicesList
         .navigationTitle("Devices")
         .overlay(alignment: .bottomTrailing) {
             Button(action: {
@@ -41,6 +35,11 @@ struct SFTPDevicesView: View {
                 connection: viewModel.editingConnection,
                 onSave: viewModel.saveConnection
             )
+        }
+        .sheet(isPresented: $viewModel.showingLocalDeviceDetail) {
+            NavigationStack {
+                LocalDeviceDetailView()
+            }
         }
         .alert("Error", isPresented: .constant(viewModel.error != nil)) {
             Button("OK") {
@@ -80,14 +79,25 @@ struct SFTPDevicesView: View {
     
     private var devicesList: some View {
         List {
-            ForEach(viewModel.connections) { connection in
-                DeviceRow(
-                    connection: connection,
-                    onEdit: { viewModel.editDevice(connection) },
-                    onDelete: { viewModel.deleteConnection(connection) },
-                    onSetDefault: { viewModel.setDefaultConnection(connection) },
-                    onTest: { await viewModel.testConnection(connection) }
+            Section("This Device") {
+                LocalDeviceRow(
+                    device: LocalDeviceManager.shared.currentDevice,
+                    onTap: { viewModel.showLocalDeviceDetail() }
                 )
+            }
+
+            if !viewModel.connections.isEmpty {
+                Section("Remote Devices") {
+                    ForEach(viewModel.connections) { connection in
+                        DeviceRow(
+                            connection: connection,
+                            onEdit: { viewModel.editDevice(connection) },
+                            onDelete: { viewModel.deleteConnection(connection) },
+                            onSetDefault: { viewModel.setDefaultConnection(connection) },
+                            onTest: { await viewModel.testConnection(connection) }
+                        )
+                    }
+                }
             }
         }
     }
@@ -99,62 +109,64 @@ struct DeviceRow: View {
     let onDelete: () -> Void
     let onSetDefault: () -> Void
     let onTest: () async -> Void
-    
+
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(connection.name)
-                        .font(.headline)
-                    
-                    if connection.isDefault {
-                        Text("DEFAULT")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .clipShape(Capsule())
+        NavigationLink(destination: TransferHistoryView(deviceId: connection.id)) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(connection.name)
+                            .font(.headline)
+
+                        if connection.isDefault {
+                            Text("DEFAULT")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                        }
                     }
-                }
-                
-                Text(connection.connectionString)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                Text(connection.rootPath)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 4) {
-                connectionStatusIndicator
-                
-                Menu {
-                    Button("Edit", action: onEdit)
-                    
-                    if !connection.isDefault {
-                        Button("Set as Default", action: onSetDefault)
-                    }
-                    
-                    Button("Test Connection") {
-                        Task { await onTest() }
-                    }
-                    
-                    Divider()
-                    
-                    Button("Delete", role: .destructive, action: onDelete)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
+
+                    Text(connection.connectionString)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    Text(connection.rootPath)
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    connectionStatusIndicator
+
+                    Menu {
+                        Button("Edit", action: onEdit)
+
+                        if !connection.isDefault {
+                            Button("Set as Default", action: onSetDefault)
+                        }
+
+                        Button("Test Connection") {
+                            Task { await onTest() }
+                        }
+
+                        Divider()
+
+                        Button("Delete", role: .destructive, action: onDelete)
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
+            .padding(.vertical, 4)
         }
-        .padding(.vertical, 4)
     }
     
     private var connectionStatusIndicator: some View {
@@ -180,6 +192,56 @@ struct DeviceRow: View {
         case .disconnected:
             return .gray
         }
+    }
+}
+
+struct LocalDeviceRow: View {
+    let device: LocalDevice
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(device.name)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        if device.isDefault {
+                            Text("DEFAULT")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                        }
+                    }
+
+                    Text(device.deviceModel + " • iOS " + device.systemVersion)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "internaldrive")
+                            .font(.caption)
+                        Text("Available: \(device.availableStorageFormatted)")
+                            .font(.caption)
+                    }
+                    .foregroundColor(device.hasLowStorage ? .orange : .secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
     }
 }
 

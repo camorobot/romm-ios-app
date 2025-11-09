@@ -108,11 +108,10 @@ class KeychainService: KeychainServiceProtocol {
 
 // MARK: - Convenience Extensions
 
-@MainActor 
 extension KeychainService {
     // Setup-specific convenience methods
     static let setup = KeychainService(service: "com.romm.app.setup")
-    
-    // SFTP-specific convenience methods  
+
+    // SFTP-specific convenience methods
     static let sftp = KeychainService(service: "com.romm.sftp")
 }

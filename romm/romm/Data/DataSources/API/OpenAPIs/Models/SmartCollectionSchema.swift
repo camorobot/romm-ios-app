@@ -9,7 +9,7 @@ import Foundation
 
 public struct SmartCollectionSchema: Codable, JSONEncodable {
 
-    public static let romIdsRule = ArrayRule(minItems: nil, maxItems: nil, uniqueItems: true)
+    public nonisolated(unsafe) static let romIdsRule = ArrayRule(minItems: nil, maxItems: nil, uniqueItems: true)
     public var name: String
     public var description: String? = ""
     public var romIds: Set<Int>
