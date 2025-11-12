@@ -247,4 +247,20 @@ class MockDependencyFactory: DependencyFactoryProtocol {
             testConnectionUseCase: makeTestConnectionUseCase()
         )
     }
+    
+    func makeSaveTransferHistoryUseCase() -> SaveTransferHistoryUseCase {
+        .init(repository: transferHistoryRepository)
+    }
+    
+    func makeGetTransferHistoryUseCase() -> GetTransferHistoryUseCase {
+        .init(repository: transferHistoryRepository)
+    }
+    
+    func makeGetTransferHistoryGroupedByPlatformUseCase() -> GetTransferHistoryGroupedByPlatformUseCase {
+        .init(repository: transferHistoryRepository)
+    }
+    
+    func makeClearTransferHistoryUseCase() -> ClearTransferHistoryUseCase {
+        .init(repository: transferHistoryRepository)
+    }
 }

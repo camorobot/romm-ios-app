@@ -10,16 +10,16 @@ func withTimeout<T>(_ timeout: TimeInterval, operation: @escaping () async throw
         group.addTask {
             return try await operation()
         }
-        
+
         group.addTask {
             try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             throw TimeoutError(timeout: timeout)
         }
-        
+
         guard let result = try await group.next() else {
             throw TimeoutError(timeout: timeout)
         }
-        
+
         group.cancelAll()
         return result
     }
@@ -110,7 +110,7 @@ class SFTPConnectionManager: ObservableObject {
         from localPath: String,
         to remotePath: String,
         connection: SFTPConnection,
-        progressHandler: @escaping (Int64, Int64) -> Void
+        progressHandler: @escaping @Sendable @MainActor (Int64, Int64) -> Void
     ) async throws {
         guard let sftpService = sftpService else {
             throw SFTPError.serviceNotConfigured
@@ -127,7 +127,7 @@ class SFTPConnectionManager: ObservableObject {
         from remotePath: String,
         to localPath: String,
         connection: SFTPConnection,
-        progressHandler: @escaping (Int64, Int64) -> Void
+        progressHandler: @escaping @Sendable @MainActor (Int64, Int64) -> Void
     ) async throws {
         guard let sftpService = sftpService else {
             throw SFTPError.serviceNotConfigured

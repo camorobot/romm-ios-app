@@ -52,6 +52,7 @@ struct RomFileInfo: Identifiable, Hashable {
 class SFTPUploadViewModel {
     var connections: [SFTPConnection] = []
     var selectedConnection: SFTPConnection?
+    var isLocalDeviceSelected = false
     var targetPath: String?
     var isUploading = false
     var uploadProgress: Double = 0.0
@@ -129,7 +130,15 @@ class SFTPUploadViewModel {
     
     private func loadConnections() {
         connections = getAllConnectionsUseCase.execute()
-        selectedConnection = manageDefaultConnectionUseCase.getDefaultConnection() ?? connections.first
+
+        // If no SFTP connections, select local device by default
+        if connections.isEmpty {
+            isLocalDeviceSelected = true
+            selectedConnection = nil
+        } else {
+            selectedConnection = manageDefaultConnectionUseCase.getDefaultConnection() ?? connections.first
+            isLocalDeviceSelected = false
+        }
     }
     
     private func loadAvailableFiles() {
@@ -201,6 +210,13 @@ class SFTPUploadViewModel {
     
     func selectConnection(_ connection: SFTPConnection) {
         selectedConnection = connection
+        isLocalDeviceSelected = false
+        targetPath = nil
+    }
+
+    func selectLocalDevice() {
+        isLocalDeviceSelected = true
+        selectedConnection = nil
         targetPath = nil
     }
     
@@ -253,6 +269,12 @@ class SFTPUploadViewModel {
     }
     
     func startUpload() async {
+        // Route to local download or SFTP upload based on selection
+        if isLocalDeviceSelected {
+            await startLocalDownload()
+            return
+        }
+
         guard let connection = selectedConnection,
               let targetPath = targetPath,
               !isUploading else { return }
@@ -361,6 +383,68 @@ class SFTPUploadViewModel {
         }
     }
     
+    private func startLocalDownload() async {
+        guard !isUploading else { return }
+
+        isUploading = true
+        uploadProgress = 0.0
+        uploadedBytes = 0
+        error = nil
+        isCompleted = false
+
+        // Get selected files to download
+        let filesToDownload = selectedFilesList
+        guard !filesToDownload.isEmpty else {
+            print("❌ Local Download: No files selected")
+            self.error = "No files selected for download"
+            isUploading = false
+            return
+        }
+
+        totalFiles = filesToDownload.count
+        totalBytes = filesToDownload.reduce(0) { $0 + $1.fileSizeBytes }
+
+        print("🔍 Local Download: Starting download of \(totalFiles) files (total: \(ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)))")
+
+        do {
+            // Create LocalROMDownloadService
+            let downloadService = LocalROMDownloadService(apiClient: apiClient)
+
+            // Download ROM files to local storage
+            let _ = try await downloadService.downloadROM(
+                rom: rom,
+                files: filesToDownload,
+                progressHandler: { [weak self] downloadedBytes, totalBytes in
+                    DispatchQueue.main.async {
+                        guard let strongSelf = self, !strongSelf.isCompleted else {
+                            return
+                        }
+
+                        let progress = totalBytes > 0 ? Double(downloadedBytes) / Double(totalBytes) : 0.0
+                        strongSelf.uploadProgress = min(max(progress, 0.0), 1.0)
+                        strongSelf.uploadedBytes = downloadedBytes
+
+                        print("🔍 Local Download Progress: \(Int(progress * 100))%")
+                    }
+                }
+            )
+
+            // Download successful
+            print("✅ Local Download: All files downloaded successfully")
+            isUploadSuccessful = true
+            isCompleted = true
+            uploadProgress = 1.0
+            uploadedBytes = totalBytes
+            error = nil
+
+        } catch {
+            print("❌ Local Download: Download failed with error: \(error)")
+            self.error = error.localizedDescription
+        }
+
+        isUploading = false
+    }
+
     func resetUpload() {
         print("🔍 SFTP Upload: Resetting upload state")
         isUploading = false
@@ -596,7 +680,13 @@ class SFTPUploadViewModel {
     
     
     var canUpload: Bool {
-        selectedConnection != nil && targetPath != nil && !isUploading && !selectedFiles.isEmpty
+        if isLocalDeviceSelected {
+            // For local device, no need for targetPath
+            return !isUploading && !selectedFiles.isEmpty
+        } else {
+            // For SFTP devices, need connection and targetPath
+            return selectedConnection != nil && targetPath != nil && !isUploading && !selectedFiles.isEmpty
+        }
     }
     
     var storageWarning: String? {

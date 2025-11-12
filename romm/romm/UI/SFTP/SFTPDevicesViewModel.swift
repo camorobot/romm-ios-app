@@ -9,6 +9,7 @@ class SFTPDevicesViewModel {
     var error: String?
     var showingAddDevice = false
     var editingConnection: SFTPConnection?
+    var showingLocalDeviceDetail = false
     
     private let getAllConnectionsUseCase: GetAllConnectionsUseCase
     private let saveConnectionUseCase: SaveConnectionUseCase
@@ -103,11 +104,15 @@ class SFTPDevicesViewModel {
     
     func refreshConnectionStatuses() async {
         await checkConnectionStatusUseCase.executeForAllConnections(for: connections, forceRefresh: true)
-        
+
         // Update all connection statuses
         for i in 0..<connections.count {
             let status = await checkConnectionStatusUseCase.execute(for: connections[i])
             connections[i].status = status
         }
+    }
+
+    func showLocalDeviceDetail() {
+        showingLocalDeviceDetail = true
     }
 }

@@ -10,7 +10,7 @@ import Foundation
 class ListDirectoryUseCase {
     private let connectionManager: SFTPConnectionManager
     
-    init(connectionManager: SFTPConnectionManager = SFTPConnectionManager.shared) {
+    init(connectionManager: SFTPConnectionManager) {
         self.connectionManager = connectionManager
     }
     

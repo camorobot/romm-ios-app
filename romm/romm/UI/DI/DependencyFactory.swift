@@ -16,6 +16,7 @@ protocol DependencyFactoryProtocol {
     var setupRepository: SetupRepositoryProtocol { get }
     var sftpRepository: SFTPRepositoryProtocol { get }
     var fileSystemRepository: FileSystemRepositoryProtocol { get }
+    var transferHistoryRepository: TransferHistoryRepositoryProtocol { get }
     
     // Services
     var sftpKeychainService: SFTPKeychainServiceProtocol { get }
@@ -61,6 +62,12 @@ protocol DependencyFactoryProtocol {
     func makeCheckConnectionStatusUseCase() -> CheckConnectionStatusUseCase
     func makeClearConnectionCacheUseCase() -> ClearConnectionCacheUseCase
     func makeGetCredentialsUseCase() -> GetCredentialsUseCase
+
+    // Transfer History Use Cases
+    func makeSaveTransferHistoryUseCase() -> SaveTransferHistoryUseCase
+    func makeGetTransferHistoryUseCase() -> GetTransferHistoryUseCase
+    func makeGetTransferHistoryGroupedByPlatformUseCase() -> GetTransferHistoryGroupedByPlatformUseCase
+    func makeClearTransferHistoryUseCase() -> ClearTransferHistoryUseCase
     
     // UI Use Cases  
     func makeGetViewModeUseCase() -> GetViewModeUseCaseProtocol
@@ -84,6 +91,7 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     lazy var collectionsRepository: CollectionsRepositoryProtocol = CollectionsRepository()
     lazy var setupRepository: SetupRepositoryProtocol = SetupRepository()
     lazy var fileSystemRepository: FileSystemRepositoryProtocol = FileSystemRepository()
+    lazy var transferHistoryRepository: TransferHistoryRepositoryProtocol = TransferHistoryRepository()
     
     // MARK: - Services (Singletons)
     
@@ -247,7 +255,25 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     func makeGetCredentialsUseCase() -> GetCredentialsUseCase {
         GetCredentialsUseCase(repository: sftpRepository)
     }
-    
+
+    // MARK: - Transfer History Use Cases
+
+    func makeSaveTransferHistoryUseCase() -> SaveTransferHistoryUseCase {
+        SaveTransferHistoryUseCase(repository: transferHistoryRepository)
+    }
+
+    func makeGetTransferHistoryUseCase() -> GetTransferHistoryUseCase {
+        GetTransferHistoryUseCase(repository: transferHistoryRepository)
+    }
+
+    func makeGetTransferHistoryGroupedByPlatformUseCase() -> GetTransferHistoryGroupedByPlatformUseCase {
+        GetTransferHistoryGroupedByPlatformUseCase(repository: transferHistoryRepository)
+    }
+
+    func makeClearTransferHistoryUseCase() -> ClearTransferHistoryUseCase {
+        ClearTransferHistoryUseCase(repository: transferHistoryRepository)
+    }
+
     // MARK: - UI Use Cases
     
     func makeGetViewModeUseCase() -> GetViewModeUseCaseProtocol {

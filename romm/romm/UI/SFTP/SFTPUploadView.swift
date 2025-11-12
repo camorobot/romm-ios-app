@@ -36,7 +36,7 @@ struct SFTPUploadView: View {
                 
                 if !viewModel.isUploading && !viewModel.isPreparing && !viewModel.isCompleted {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Upload") {
+                        Button(viewModel.isLocalDeviceSelected ? "Download" : "Upload") {
                             Task {
                                 await viewModel.startUpload()
                             }
@@ -117,41 +117,48 @@ struct SFTPUploadView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Select Device")
                     .font(.headline)
-                
-                if viewModel.connections.isEmpty {
-                    VStack(spacing: 12) {
-                        Text("No SFTP devices configured")
-                            .foregroundColor(.secondary)
-                        
-                        Button("Add Device") {
-                            showingDeviceManagement = true
-                        }
-                        .buttonStyle(.borderedProminent)
+
+                LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
+                    // Local Device (This iPhone/iPad)
+                    LocalDeviceSelectionRow(
+                        isSelected: viewModel.isLocalDeviceSelected,
+                        onSelect: { viewModel.selectLocalDevice() }
+                    )
+
+                    // SFTP Devices
+                    ForEach(viewModel.connections) { connection in
+                        DeviceSelectionRow(
+                            connection: connection,
+                            isSelected: viewModel.selectedConnection?.id == connection.id,
+                            onSelect: { viewModel.selectConnection(connection) }
+                        )
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-                } else {
-                    LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
-                        ForEach(viewModel.connections) { connection in
-                            DeviceSelectionRow(
-                                connection: connection,
-                                isSelected: viewModel.selectedConnection?.id == connection.id,
-                                onSelect: { viewModel.selectConnection(connection) }
-                            )
+
+                    // Add Device Button
+                    Button {
+                        showingDeviceManagement = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "plus.circle")
+                            Text("Add Remote Device")
+                            Spacer()
                         }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
                     }
+                    .buttonStyle(.plain)
                 }
             }
             
-            if viewModel.selectedConnection != nil {
+            // Target Path Selection (only for SFTP devices)
+            if viewModel.selectedConnection != nil && !viewModel.isLocalDeviceSelected {
                 Divider()
-                
-                // Target Path Selection
+
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Target Directory")
                         .font(.headline)
-                    
+
                     Button(action: viewModel.browseDirectories) {
                         HStack {
                             Image(systemName: "folder")
@@ -169,8 +176,8 @@ struct SFTPUploadView: View {
                 }
             }
             
-            // Duplicate Files Warning
-            if viewModel.hasDuplicateWarnings {
+            // Duplicate Files Warning (only for SFTP devices)
+            if viewModel.hasDuplicateWarnings && !viewModel.isLocalDeviceSelected {
                 duplicateWarningsSection
             }
             
@@ -200,14 +207,16 @@ struct SFTPUploadView: View {
         VStack(spacing: 24) {
             // Progress Indicator
             VStack(spacing: 16) {
-                Image(systemName: viewModel.isPreparing ? "arrow.down.circle" : "icloud.and.arrow.up")
+                let iconName = viewModel.isPreparing ? "arrow.down.circle" : (viewModel.isLocalDeviceSelected ? "arrow.down.circle" : "icloud.and.arrow.up")
+                Image(systemName: iconName)
                     .font(.system(size: 60))
                     .foregroundColor(.accentColor)
-                
+
                 let fileCount = viewModel.totalFiles
-                Text(viewModel.isPreparing ? 
-                     (fileCount > 1 ? "Preparing \(fileCount) files..." : "Preparing ROM...") : 
-                     (fileCount > 1 ? "Uploading \(fileCount) files..." : "Uploading ROM..."))
+                let actionText = viewModel.isLocalDeviceSelected ? "Downloading" : "Uploading"
+                Text(viewModel.isPreparing ?
+                     (fileCount > 1 ? "Preparing \(fileCount) files..." : "Preparing ROM...") :
+                     (fileCount > 1 ? "\(actionText) \(fileCount) files..." : "\(actionText) ROM..."))
                     .font(.title2)
                     .fontWeight(.semibold)
                 
@@ -262,13 +271,14 @@ struct SFTPUploadView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 60))
                     .foregroundColor(.green)
-                
-                Text("Upload Complete!")
+
+                Text(viewModel.isLocalDeviceSelected ? "Download Complete!" : "Upload Complete!")
                     .font(.title2)
                     .fontWeight(.semibold)
-                
+
                 let fileCount = viewModel.totalFiles
-                Text(fileCount > 1 ? "All \(fileCount) files have been successfully transferred to the device." : "Your ROM has been successfully transferred to the device.")
+                let actionText = viewModel.isLocalDeviceSelected ? "downloaded to" : "transferred to"
+                Text(fileCount > 1 ? "All \(fileCount) files have been successfully \(actionText) the device." : "Your ROM has been successfully \(actionText) the device.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -308,16 +318,26 @@ struct SFTPUploadView: View {
                     Text("Device:")
                         .fontWeight(.medium)
                     Spacer()
-                    Text(viewModel.selectedConnection?.name ?? "Unknown")
+                    Text(viewModel.isLocalDeviceSelected ? UIDevice.current.name : (viewModel.selectedConnection?.name ?? "Unknown"))
                         .foregroundColor(.secondary)
                 }
-                
-                HStack {
-                    Text("Location:")
-                        .fontWeight(.medium)
-                    Spacer()
-                    Text(viewModel.targetPath ?? "Unknown")
-                        .foregroundColor(.secondary)
+
+                if viewModel.isLocalDeviceSelected {
+                    HStack {
+                        Text("Location:")
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text("Documents/ROMs/")
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    HStack {
+                        Text("Location:")
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text(viewModel.targetPath ?? "Unknown")
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             .padding()
@@ -545,11 +565,64 @@ struct FileSelectionRow: View {
     }
 }
 
+struct LocalDeviceSelectionRow: View {
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    @MainActor
+    private var deviceName: String {
+        LocalDeviceManager.shared.currentDevice.name
+    }
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack {
+                Image(systemName: "iphone")
+                    .font(.title2)
+                    .foregroundColor(.accentColor)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(deviceName)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        Text("(This Device)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text("Download to local storage")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.accentColor)
+                }
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? Color.accentColor.opacity(0.1) : Color(.systemGray6))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct DeviceSelectionRow: View {
     let connection: SFTPConnection
     let isSelected: Bool
     let onSelect: () -> Void
-    
+
     var body: some View {
         Button(action: onSelect) {
             HStack {
@@ -557,14 +630,14 @@ struct DeviceSelectionRow: View {
                     Text(connection.name)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     Text(connection.connectionString)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.accentColor)

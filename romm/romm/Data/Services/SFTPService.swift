@@ -192,8 +192,8 @@ protocol SFTPServiceProtocol {
     func testConnection(_ connection: SFTPConnection) async throws -> Bool
     func testConnectionWithCredentials(_ connection: SFTPConnection, credentials: SFTPCredentials) async throws -> Bool
     func listDirectory(at path: String, connection: SFTPConnection) async throws -> [SFTPDirectoryItem]
-    func uploadFile(from localPath: String, to remotePath: String, connection: SFTPConnection, progressHandler: @escaping (Int64, Int64) -> Void) async throws
-    func downloadFile(from remotePath: String, to localPath: String, connection: SFTPConnection, progressHandler: @escaping (Int64, Int64) -> Void) async throws
+    func uploadFile(from localPath: String, to remotePath: String, connection: SFTPConnection, progressHandler: @escaping @Sendable @MainActor (Int64, Int64) -> Void) async throws
+    func downloadFile(from remotePath: String, to localPath: String, connection: SFTPConnection, progressHandler: @escaping @Sendable @MainActor (Int64, Int64) -> Void) async throws
     func createDirectory(at path: String, connection: SFTPConnection) async throws
     func deleteFile(at path: String, connection: SFTPConnection) async throws
 }
@@ -327,7 +327,7 @@ class SFTPService: SFTPServiceProtocol {
         }
     }
     
-    func uploadFile(from localPath: String, to remotePath: String, connection: SFTPConnection, progressHandler: @escaping (Int64, Int64) -> Void) async throws {
+    func uploadFile(from localPath: String, to remotePath: String, connection: SFTPConnection, progressHandler: @escaping @Sendable @MainActor (Int64, Int64) -> Void) async throws {
         return try await withCheckedThrowingContinuation { continuation in
             Task {
                 do {
@@ -411,7 +411,7 @@ class SFTPService: SFTPServiceProtocol {
         }
     }
     
-    func downloadFile(from remotePath: String, to localPath: String, connection: SFTPConnection, progressHandler: @escaping (Int64, Int64) -> Void) async throws {
+    func downloadFile(from remotePath: String, to localPath: String, connection: SFTPConnection, progressHandler: @escaping @Sendable @MainActor (Int64, Int64) -> Void) async throws {
         return try await withCheckedThrowingContinuation { continuation in
             Task {
                 do {
