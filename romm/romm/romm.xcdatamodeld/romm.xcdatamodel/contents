@@ -3,7 +3,22 @@
     <entity name="Item" representedClassName="Item" syncable="YES" codeGenerationType="class">
         <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
     </entity>
+    <entity name="TransferHistoryEntity" representedClassName="TransferHistoryEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="deviceId" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="deviceName" attributeType="String"/>
+        <attribute name="deviceType" attributeType="String"/>
+        <attribute name="fileSizeBytes" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="platformName" attributeType="String"/>
+        <attribute name="platformSlug" optional="YES" attributeType="String"/>
+        <attribute name="romId" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="romName" attributeType="String"/>
+        <attribute name="success" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="transferDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="transferType" attributeType="String"/>
+    </entity>
     <elements>
         <element name="Item" positionX="-63" positionY="-18" width="128" height="44"/>
+        <element name="TransferHistoryEntity" positionX="-63" positionY="9" width="128" height="209"/>
     </elements>
 </model>
