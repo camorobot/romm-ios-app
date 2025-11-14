@@ -9,6 +9,7 @@
 // MARK: - Mock Factory for Testing
 
 class MockDependencyFactory: DependencyFactoryProtocol {
+    var transferHistoryRepository: TransferHistoryRepositoryProtocol
     
     // Mock repositories can be injected for testing
     var authRepository: AuthRepositoryProtocol
@@ -63,6 +64,7 @@ class MockDependencyFactory: DependencyFactoryProtocol {
         }
         
         self.apiClient = apiClient ?? RommAPIClient.shared
+        transferHistoryRepository = TransferHistoryRepository()
     }
     
     func makeLogoutUseCase() -> LogoutUseCase {

@@ -89,23 +89,49 @@ enum APIClientError: LocalizedError {
     }
 }
 
+// URLSession delegate that accepts self-signed certificates for self-hosted servers
+private class SelfSignedCertificateDelegate: NSObject, URLSessionDelegate {
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+
+        // Accept self-signed certificates for ServerTrust authentication
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+           let serverTrust = challenge.protectionSpace.serverTrust {
+            let credential = URLCredential(trust: serverTrust)
+            completionHandler(.useCredential, credential)
+        } else {
+            completionHandler(.performDefaultHandling, nil)
+        }
+    }
+}
+
 class RommAPIClient: RommAPIClientProtocol {
     static let shared = RommAPIClient()
-    
+
     private let tokenProvider: TokenProviderProtocol
     private let urlSession: URLSession
     private let logger = Logger.network
-    
+    private let sessionDelegate = SelfSignedCertificateDelegate()
+
     // Cache for configuration to avoid repeated setup
     private var cachedBaseURL: String?
     private var cachedUsername: String?
     private var cachedPassword: String?
     private var isConfigured = false
-    
+
     init(tokenProvider: TokenProviderProtocol = TokenProvider(),
-         urlSession: URLSession = URLSession.shared) {
+         urlSession: URLSession? = nil) {
         self.tokenProvider = tokenProvider
-        self.urlSession = urlSession
+
+        // Create URLSession with custom delegate that accepts self-signed certificates
+        if let urlSession = urlSession {
+            self.urlSession = urlSession
+        } else {
+            let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = 30.0
+            configuration.timeoutIntervalForResource = 60.0
+            self.urlSession = URLSession(configuration: configuration, delegate: sessionDelegate, delegateQueue: nil)
+        }
+
         setupAPIConfiguration()
     }
     
@@ -192,10 +218,11 @@ class RommAPIClient: RommAPIClientProtocol {
     func makeRequest(path: String, method: HTTPMethod, body: Data? = nil) async throws -> Data {
         let measurement = PerformanceMeasurement(operation: "\(method.rawValue) \(path)")
         logger.logNetworkRequest(method: method.rawValue, url: path)
-        
-        // Update configuration from token provider
+
+        // Update configuration from token provider (optimized - only when needed)
+        // This call is now very cheap due to early-exit caching in setupAPIConfiguration
         setupAPIConfiguration()
-        
+
         // Build full URL
         let url = try buildURL(path: path)
         

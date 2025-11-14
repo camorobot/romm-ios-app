@@ -5,7 +5,7 @@ struct TimeoutError: Error {
     let timeout: TimeInterval
 }
 
-func withTimeout<T>(_ timeout: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+func withTimeout<T: Sendable>(_ timeout: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
     return try await withThrowingTaskGroup(of: T.self) { group in
         group.addTask {
             return try await operation()
@@ -47,7 +47,7 @@ class SFTPConnectionManager: ObservableObject {
     func checkConnectionStatus(for connection: SFTPConnection, forceRefresh: Bool = false) async -> ConnectionStatus {
         let cacheKey: UUID = connection.id
         
-        if !forceRefresh, 
+        if !forceRefresh,
            let cached = connectionStatusCache[cacheKey],
            Date().timeIntervalSince(cached.lastChecked) < cacheValidityDuration {
             await MainActor.run {

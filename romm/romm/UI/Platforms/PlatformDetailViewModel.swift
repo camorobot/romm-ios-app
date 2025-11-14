@@ -48,21 +48,37 @@ class PlatformDetailViewModel {
     private var totalRoms = 0
     private var currentPlatformId: Int?
     private var currentChar: String?
-    var currentOrderBy: String = UserDefaults.standard.string(forKey: "selectedSortOrderBy") ?? "name"
-    var currentOrderDir: String = UserDefaults.standard.string(forKey: "selectedSortOrderDir") ?? "asc"
-    
+    var currentOrderBy: String = "name"
+    var currentOrderDir: String = "asc"
+
     init(factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
         self.romsUseCase = factory.makeGetRomsUseCase()
         self.romsWithFiltersUseCase = factory.makeGetRomsWithFiltersUseCase()
         self.getViewModeUseCase = factory.makeGetViewModeUseCase()
         self.saveViewModeUseCase = factory.makeSaveViewModeUseCase()
+
+        // Load saved sort preferences asynchronously
+        Task {
+            await loadSortPreferences()
+        }
+
         loadViewMode()
     }
-    
+
+    private func loadSortPreferences() async {
+        let asyncDefaults = AsyncUserDefaults.shared
+        if let orderBy = await asyncDefaults.string(forKey: "selectedSortOrderBy") {
+            currentOrderBy = orderBy
+        }
+        if let orderDir = await asyncDefaults.string(forKey: "selectedSortOrderDir") {
+            currentOrderDir = orderDir
+        }
+    }
+
     private func loadViewMode() {
         viewMode = getViewModeUseCase.execute()
     }
-    
+
     func updateViewMode(_ newMode: ViewMode) {
         viewMode = newMode
         saveViewModeUseCase.execute(newMode)
@@ -230,14 +246,17 @@ class PlatformDetailViewModel {
     
     func sortRoms(orderBy: String, orderDir: String) async {
         logger.info("Sorting ROMs by \(orderBy) \(orderDir)")
-        
+
         currentOrderBy = orderBy
         currentOrderDir = orderDir
-        
-        // Persist sort settings
-        UserDefaults.standard.set(orderBy, forKey: "selectedSortOrderBy")
-        UserDefaults.standard.set(orderDir, forKey: "selectedSortOrderDir")
-        
+
+        // Persist sort settings asynchronously (fire and forget)
+        Task.detached {
+            let asyncDefaults = AsyncUserDefaults.shared
+            await asyncDefaults.set(orderBy, forKey: "selectedSortOrderBy")
+            await asyncDefaults.set(orderDir, forKey: "selectedSortOrderDir")
+        }
+
         // Reload data with new sorting
         guard let platformId = currentPlatformId else { return }
         await loadRoms(for: platformId, refresh: true)

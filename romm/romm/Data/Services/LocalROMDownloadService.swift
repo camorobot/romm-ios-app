@@ -36,7 +36,6 @@ protocol LocalROMDownloadServiceProtocol {
     ) async throws -> DownloadedROM
 }
 
-@MainActor
 class LocalROMDownloadService: LocalROMDownloadServiceProtocol {
 
     private let apiClient: RommAPIClientProtocol
@@ -63,9 +62,9 @@ class LocalROMDownloadService: LocalROMDownloadServiceProtocol {
         // 1. Calculate total size
         let totalSize = files.reduce(0) { $0 + $1.fileSizeBytes }
 
-        // 2. Check available storage
-        let deviceManager = LocalDeviceManager.shared
-        deviceManager.updateStorageInfo()
+        // 2. Check available storage on MainActor
+        let deviceManager = await MainActor.run { LocalDeviceManager.shared }
+        await MainActor.run { deviceManager.updateStorageInfo() }
 
         guard deviceManager.hasEnoughStorage(for: totalSize) else {
             throw LocalROMDownloadError.insufficientStorage(
@@ -106,9 +105,11 @@ class LocalROMDownloadService: LocalROMDownloadServiceProtocol {
                     to: localFileURL,
                     expectedSize: fileInfo.fileSizeBytes
                 ) { downloadedBytes in
-                    // Update progress for this file
+                    // Update progress for this file on main thread
                     let currentTotalBytes = totalDownloadedBytes + downloadedBytes
-                    progressHandler(currentTotalBytes, totalSize)
+                    Task { @MainActor in
+                        progressHandler(currentTotalBytes, totalSize)
+                    }
                 }
 
                 // Verify file was downloaded

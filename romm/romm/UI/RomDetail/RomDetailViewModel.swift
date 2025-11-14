@@ -82,26 +82,26 @@ class RomDetailViewModel {
     
     func toggleFavorite(originalRom: Rom) {
         logger.debug("Toggling favorite for ROM \(originalRom.id): \(originalRom.name)")
-        
-        Task {
+
+        Task { @MainActor in
             do {
                 // Use the actual favorite status from Collections API
                 let currentFavoriteState = actualFavoriteStatus
                 let romId = romDetails?.id ?? originalRom.id
-                
+
                 let newFavoriteState = !currentFavoriteState
                 logger.debug("Current favorite state: \(currentFavoriteState) -> New state: \(newFavoriteState)")
-                
+
                 try await toggleRomFavoriteUseCase.execute(
                     romId: romId,
                     isFavorite: newFavoriteState
                 )
-                
+
                 logger.info("Successfully toggled favorite state")
-                
+
                 // Update the actual favorite status
                 actualFavoriteStatus = newFavoriteState
-                
+
                 // Also update the romDetails if available
                 if let romDetails = romDetails {
                     self.romDetails = RomDetails(
@@ -125,7 +125,7 @@ class RomDetailViewModel {
                         platformDisplayName: romDetails.platformDisplayName
                     )
                 }
-                
+
             } catch {
                 logger.error("Error toggling favorite: \(error)")
                 errorMessage = error.localizedDescription

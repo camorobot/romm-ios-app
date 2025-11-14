@@ -135,8 +135,7 @@ public struct SimpleRomSchema: Codable, JSONEncodable, Hashable {
         case tgdbId = "tgdb_id"
         case platformId = "platform_id"
         case platformSlug = "platform_slug"
-        case platformFsSlug = "platform_fs_slug"
-        case platformName = "platform_name"
+        case platformFsSlug = "platform_fs_slug"        
         case platformCustomName = "platform_custom_name"
         case platformDisplayName = "platform_display_name"
         case fsName = "fs_name"
@@ -196,7 +195,7 @@ public struct SimpleRomSchema: Codable, JSONEncodable, Hashable {
         platformId = try container.decode(Int.self, forKey: .platformId)
         platformSlug = try container.decode(String.self, forKey: .platformSlug)
         platformFsSlug = try container.decode(String.self, forKey: .platformFsSlug)
-        platformName = try container.decode(String.self, forKey: .platformName)
+        platformName = ""
         platformCustomName = try container.decodeIfPresent(String.self, forKey: .platformCustomName)
         platformDisplayName = try container.decode(String.self, forKey: .platformDisplayName)
         fsName = try container.decode(String.self, forKey: .fsName)
@@ -257,7 +256,6 @@ public struct SimpleRomSchema: Codable, JSONEncodable, Hashable {
         try container.encode(platformId, forKey: .platformId)
         try container.encode(platformSlug, forKey: .platformSlug)
         try container.encode(platformFsSlug, forKey: .platformFsSlug)
-        try container.encode(platformName, forKey: .platformName)
         try container.encode(platformCustomName, forKey: .platformCustomName)
         try container.encode(platformDisplayName, forKey: .platformDisplayName)
         try container.encode(fsName, forKey: .fsName)

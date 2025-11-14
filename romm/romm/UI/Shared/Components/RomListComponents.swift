@@ -52,7 +52,13 @@ struct RomListHeaderView: View {
                     case .table:
                         viewMode = .smallCard
                     }
-                    UserDefaults.standard.set(viewMode.rawValue, forKey: "selectedViewMode")
+
+                    // Save view mode preference asynchronously
+                    let selectedMode = viewMode
+                    Task.detached {
+                        let asyncDefaults = AsyncUserDefaults.shared
+                        await asyncDefaults.set(selectedMode.rawValue, forKey: "selectedViewMode")
+                    }
                 }
             }) {
                 HStack(spacing: 6) {

@@ -378,7 +378,12 @@ private class SessionDelegate: NSObject, URLSessionTaskDelegate {
         if let taskDidReceiveChallenge = challengeHandlerStore[task.taskIdentifier] {
             (disposition, credential) = taskDidReceiveChallenge(session, task, challenge)
         } else {
-            if challenge.previousFailureCount > 0 {
+            // Accept self-signed certificates for self-hosted servers
+            if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+               let serverTrust = challenge.protectionSpace.serverTrust {
+                credential = URLCredential(trust: serverTrust)
+                disposition = .useCredential
+            } else if challenge.previousFailureCount > 0 {
                 disposition = .rejectProtectionSpace
             } else {
                 credential = credentialStore[task.taskIdentifier] ?? session.configuration.urlCredentialStorage?.defaultCredential(for: challenge.protectionSpace)
