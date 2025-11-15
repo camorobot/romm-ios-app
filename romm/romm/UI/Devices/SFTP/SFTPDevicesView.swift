@@ -186,7 +186,7 @@ struct DeviceRow: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
-    }
+    }	
     
     private var statusColor: Color {
         switch connection.status {

@@ -28,10 +28,10 @@ class ImageCacheSettings: ObservableObject {
     
     // MARK: - Default Values
     private enum Defaults {
-        static let diskCacheLimitMB = 500   // 500MB
-        static let cacheEnabled = true
-        static let preloadEnabled = true
-        static let diskCacheExpiryDays = 7  // 1 week
+        static let diskCacheLimitMB = 250   // 250MB (user-requested default)
+        static let cacheEnabled = true      // Always enabled (simplified)
+        static let preloadEnabled = true    // Always enabled (simplified)
+        static let diskCacheExpiryDays = 30 // 30 days (fixed, not user-configurable)
     }
     
     // MARK: - Properties

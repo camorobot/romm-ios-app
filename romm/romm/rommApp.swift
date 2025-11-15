@@ -9,10 +9,10 @@ import SwiftUI
 
 @main
 struct rommApp: App {
-    
+
     init() {
-        // Initialize image cache configuration at app startup
-        _ = ImageCacheConfiguration.shared
+        // Initialize Kingfisher cache configuration at app startup
+        _ = KingfisherCacheManager.shared
     }
 
     var body: some Scene {

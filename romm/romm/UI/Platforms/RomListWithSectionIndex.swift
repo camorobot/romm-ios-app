@@ -261,7 +261,7 @@ struct SmallRomListRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(urlString: rom.urlCover) { image in
+            CachedKFImage(urlString: rom.urlCover) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -303,7 +303,7 @@ struct BigRomListRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(urlString: rom.urlCover) { image in
+            CachedKFImage(urlString: rom.urlCover) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -475,7 +475,7 @@ struct RomTableView: View {
                             HStack(spacing: 0) {
                                 // Title Column
                                 HStack(spacing: 8) {
-                                    CachedAsyncImage(urlString: rom.urlCover) { image in
+                                    CachedKFImage(urlString: rom.urlCover) { image in
                                         image
                                             .resizable()
                                             .aspectRatio(contentMode: .fill)
@@ -670,7 +670,7 @@ struct RomTableView: View {
                                 // Title Column
                                 HStack(spacing: 4) {
                                     // Icon
-                                    CachedAsyncImage(urlString: rom.urlCover) { image in
+                                    CachedKFImage(urlString: rom.urlCover) { image in
                                         image
                                             .resizable()
                                             .aspectRatio(contentMode: .fill)

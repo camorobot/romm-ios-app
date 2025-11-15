@@ -83,7 +83,7 @@ struct RomDetailView: View {
                         defaultHeight: 400
                     ) {
                         ZStack(alignment: .top) {
-                            CachedAsyncImage(urlString: rom.urlCover) { image in
+                            CachedKFImage(urlString: rom.urlCover) { image in
                                 image
                                     .resizable()
                                     .scaledToFill()
@@ -1234,7 +1234,7 @@ struct GameDataCard: View {
             // Screenshot/Preview Area
             ZStack {
                 if let screenshot = screenshot {
-                    CachedAsyncImage(urlString: screenshot.downloadPath) { image in
+                    CachedKFImage(urlString: screenshot.downloadPath) { image in
                         image
                             .resizable()
                             .scaledToFill()

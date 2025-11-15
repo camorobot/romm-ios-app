@@ -168,7 +168,7 @@ struct CollectionRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             // Collection cover
-            CachedAsyncImage(urlString: collection.urlCover) { image in
+            CachedKFImage(urlString: collection.urlCover) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)

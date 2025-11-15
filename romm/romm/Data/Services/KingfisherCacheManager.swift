@@ -7,6 +7,7 @@
 
 import Foundation
 import Kingfisher
+import UIKit
 
 // MARK: - Kingfisher Configuration Manager
 
@@ -23,15 +24,24 @@ class KingfisherCacheManager: ObservableObject {
         // Configure memory cache with reasonable defaults (not user-configurable)
         ImageCache.default.memoryStorage.config.totalCostLimit = 100 * 1024 * 1024 // 100 MB
         ImageCache.default.memoryStorage.config.countLimit = 500
-        
+
         // Configure disk cache with size limit AND expiry
         ImageCache.default.diskStorage.config.sizeLimit = UInt(settings.diskCacheLimitBytes)
         ImageCache.default.diskStorage.config.expiration = .seconds(settings.diskCacheExpirySeconds)
-        
+
         // Configure downloader
         ImageDownloader.default.downloadTimeout = 30.0
-        
-        // Let Kingfisher's automatic size management handle cache cleanup
+        ImageDownloader.default.sessionConfiguration.httpMaximumConnectionsPerHost = 6
+
+        // Configure default options for KingfisherManager
+        KingfisherManager.shared.defaultOptions = [
+            .diskCacheExpiration(.seconds(settings.diskCacheExpirySeconds)),
+            .backgroundDecode,
+            .scaleFactor(UIScreen.main.scale),
+            .cacheOriginalImage
+        ]
+
+        Logger.general.info("🖼️ Kingfisher configured: Memory=100MB, Disk=\(settings.diskCacheLimitBytes / 1024 / 1024)MB, Expiry=\(settings.diskCacheExpirySeconds / 86400)d")
     }
     
     func updateSettings() {

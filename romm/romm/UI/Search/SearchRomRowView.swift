@@ -21,7 +21,7 @@ struct SearchRomRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            CachedAsyncImage(urlString: rom.urlCover) { image in
+            CachedKFImage(urlString: rom.urlCover) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
