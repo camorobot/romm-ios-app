@@ -32,9 +32,9 @@ class SFTPConnectionManager: ObservableObject {
 
     private var sftpService: SFTPServiceProtocol?
     private var connectionStatusCache = [UUID: (status: ConnectionStatus, lastChecked: Date)]()
-    // OPTIMIZED: Longer cache validity for better performance
-    private let cacheValidityDuration: TimeInterval = 60 // Increased from 30 to 60 seconds
-    private let connectionTimeout: TimeInterval = 10
+    // OPTIMIZED: Long cache validity to prevent repeated tests on screen switches
+    private let cacheValidityDuration: TimeInterval = 300 // 5 minutes for better UX
+    private let connectionTimeout: TimeInterval = 3 // Reduced from 10s to 3s
 
     // Use MainActor for Published properties only
     @MainActor @Published var connectionStatuses = [UUID: ConnectionStatus]()

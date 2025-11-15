@@ -246,53 +246,93 @@ class SFTPService: SFTPServiceProtocol {
         }
     }
     
-    // OPTIMIZED: Fast connection test with proper background execution
+    // OPTIMIZED: MFT completely isolated in background thread with hard timeout
     func testConnection(_ connection: SFTPConnection) async throws -> Bool {
-        // Use Task.detached with proper isolation to avoid blocking main thread
-        return try await withCheckedThrowingContinuation { continuation in
-            Task.detached(priority: .userInitiated) { [weak self] in
-                do {
-                    guard let self else {
-                        continuation.resume(returning: false)
-                        return
+        return try await withThrowingTaskGroup(of: Bool.self) { group in
+            // Task 1: Actual connection test in dedicated background queue
+            // This ensures MFT's blocking socket operations don't block Swift Concurrency threads
+            group.addTask {
+                try await withCheckedThrowingContinuation { continuation in
+                    // Use DispatchQueue instead of Task.detached for complete isolation
+                    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                        guard let self else {
+                            continuation.resume(returning: false)
+                            return
+                        }
+
+                        do {
+                            let sftp = self.createConnection(connection)
+                            defer { sftp.disconnect() }
+
+                            // MFT's blocking calls run in isolated background thread
+                            try sftp.connect()
+                            try self.authenticateConnection(sftp, connection: connection)
+
+                            continuation.resume(returning: true)
+                        } catch {
+                            continuation.resume(throwing: self.mapMFTError(error))
+                        }
                     }
-                    
-                    // Create connection in background
-                    let sftp = self.createConnection(connection)
-                    
-                    // Use defer to ensure cleanup happens
-                    defer { 
-                        sftp.disconnect() 
-                    }
-                    
-                    // Quick connection test with timeout built into SSH framework
-                    try sftp.connect()
-                    try self.authenticateConnection(sftp, connection: connection)
-                    
-                    continuation.resume(returning: true)
-                } catch {
-                    continuation.resume(throwing: self?.mapMFTError(error) ?? .connectionFailed)
                 }
             }
+
+            // Task 2: Hard timeout (3 seconds)
+            // This ensures UI responsiveness even if MFT hangs
+            group.addTask {
+                try await Task.sleep(nanoseconds: 3_000_000_000) // 3s
+                throw SFTPError.connectionTimeout
+            }
+
+            // Race: First to complete wins
+            guard let result = try await group.next() else {
+                throw SFTPError.connectionTimeout
+            }
+
+            // Cancel the other task (either timeout or connection test)
+            group.cancelAll()
+            return result
         }
     }
     
     func testConnectionWithCredentials(_ connection: SFTPConnection, credentials: SFTPCredentials) async throws -> Bool {
-        return try await withCheckedThrowingContinuation { continuation in
-            Task {
-                do {
-                    let sftp = createConnection(connection, with: credentials)
-                    
-                    try sftp.connect()
-                    defer { sftp.disconnect() }
-                    
-                    try authenticateConnection(sftp, connection: connection, credentials: credentials)
-                    
-                    continuation.resume(returning: true)
-                } catch {
-                    continuation.resume(throwing: mapMFTError(error))
+        // Same isolation strategy as testConnection for consistency
+        return try await withThrowingTaskGroup(of: Bool.self) { group in
+            // Task 1: Connection test in background queue
+            group.addTask {
+                try await withCheckedThrowingContinuation { continuation in
+                    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                        guard let self else {
+                            continuation.resume(returning: false)
+                            return
+                        }
+
+                        do {
+                            let sftp = self.createConnection(connection, with: credentials)
+                            defer { sftp.disconnect() }
+
+                            try sftp.connect()
+                            try self.authenticateConnection(sftp, connection: connection, credentials: credentials)
+
+                            continuation.resume(returning: true)
+                        } catch {
+                            continuation.resume(throwing: self.mapMFTError(error))
+                        }
+                    }
                 }
             }
+
+            // Task 2: Hard timeout (3 seconds)
+            group.addTask {
+                try await Task.sleep(nanoseconds: 3_000_000_000)
+                throw SFTPError.connectionTimeout
+            }
+
+            guard let result = try await group.next() else {
+                throw SFTPError.connectionTimeout
+            }
+
+            group.cancelAll()
+            return result
         }
     }
     

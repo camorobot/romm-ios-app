@@ -9,9 +9,12 @@ class SFTPDevicesViewModel {
     var showingAddDevice = false
     var editingConnection: SFTPConnection?
     var showingLocalDeviceDetail = false
-    
+
     // Track running connection tests to allow cancellation
     private var runningTasks: [UUID: Task<Void, Never>] = [:]
+
+    // Prevent repeated loading on every view appear
+    private var hasLoadedOnce = false
     
     private let getAllConnectionsUseCase: GetAllConnectionsUseCase
     private let saveConnectionUseCase: SaveConnectionUseCase
@@ -36,12 +39,18 @@ class SFTPDevicesViewModel {
     }
 
     func loadConnectionsAsync() async {
+        // Only load once per ViewModel lifecycle to prevent repeated tests on every screen open
+        guard !hasLoadedOnce else { return }
+        hasLoadedOnce = true
+
         loadConnections()
-        
-        // Only check status if we don't have cached status or if it's been a while
-        // This prevents unnecessary network calls every time view appears
+
+        // Load cached statuses first (instant, no network calls)
+        await loadStatusesFromCache()
+
+        // Only refresh if we have no cached data at all
         let needsRefresh = connections.allSatisfy { $0.status == .disconnected }
-        
+
         if needsRefresh {
             await refreshConnectionStatuses()
         }
@@ -160,12 +169,17 @@ class SFTPDevicesViewModel {
                 return updatedConnection
             }
         }
-        
+
         // Check all connections in parallel (fast!)
+        // This already updates the cache AND the local connections array
         await checkConnectionStatusUseCase.executeForAllConnections(for: connections, forceRefresh: true)
 
-        // Update local array with cached statuses (instant - no network calls)
-        // Note: executeForAllConnections already updated the cache, so forceRefresh: false
+        // Load updated statuses from cache (instant - no redundant network calls)
+        await loadStatusesFromCache()
+    }
+
+    // Load connection statuses from cache only (no network calls)
+    private func loadStatusesFromCache() async {
         for i in 0..<connections.count {
             let status = await checkConnectionStatusUseCase.execute(for: connections[i], forceRefresh: false)
             await MainActor.run {
