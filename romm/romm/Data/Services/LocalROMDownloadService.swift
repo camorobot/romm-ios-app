@@ -62,19 +62,24 @@ class LocalROMDownloadService: LocalROMDownloadServiceProtocol {
         // 1. Calculate total size
         let totalSize = files.reduce(0) { $0 + $1.fileSizeBytes }
 
-        // 2. Check available storage on MainActor
+        // 2. Check available storage asynchronously to avoid blocking main thread
         let deviceManager = await MainActor.run { LocalDeviceManager.shared }
-        await MainActor.run { deviceManager.updateStorageInfo() }
+        await deviceManager.updateStorageInfoAsync()
 
-        guard deviceManager.hasEnoughStorage(for: totalSize) else {
+        let hasEnoughStorage = await MainActor.run {
+            deviceManager.hasEnoughStorage(for: totalSize)
+        }
+
+        guard hasEnoughStorage else {
+            let availableStorage = await MainActor.run { deviceManager.availableStorageBytes }
             throw LocalROMDownloadError.insufficientStorage(
                 required: totalSize,
-                available: deviceManager.availableStorageBytes
+                available: availableStorage
             )
         }
 
         // 3. Create ROM directory
-        let platformName = rom.platform?.name ?? "Unknown Platform"
+        let platformName = rom.platform?.name ?? rom.platformSlug ?? ""
         let romDirectoryPath = LocalROMRepository.createROMDirectoryPath(
             platformName: platformName,
             romName: rom.name

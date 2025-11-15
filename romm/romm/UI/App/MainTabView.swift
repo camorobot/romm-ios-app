@@ -31,7 +31,7 @@ struct MainTabView: View {
             
             Tab("Devices", systemImage: "server.rack") {
                 NavigationStack {
-                    SFTPDevicesView(dependencyFactory: dependencyFactory)
+                    SFTPDevicesView()
                 }
             }
             
@@ -43,7 +43,7 @@ struct MainTabView: View {
 
             Tab("Search", systemImage: "magnifyingglass", role: .search) {
                 NavigationStack {
-                    SearchView(dependencyFactory: dependencyFactory)
+                    SearchView()
                 }
             }
         }

@@ -215,15 +215,7 @@ class MockDependencyFactory: DependencyFactoryProtocol {
     // MARK: - SFTP ViewModels
     
     @MainActor func makeSFTPDevicesViewModel() -> SFTPDevicesViewModel {
-        SFTPDevicesViewModel(
-            getAllConnectionsUseCase: makeGetAllConnectionsUseCase(),
-            saveConnectionUseCase: makeSaveConnectionUseCase(),
-            deleteConnectionUseCase: makeDeleteConnectionUseCase(),
-            manageDefaultConnectionUseCase: makeManageDefaultConnectionUseCase(),
-            testConnectionUseCase: makeTestConnectionUseCase(),
-            checkConnectionStatusUseCase: makeCheckConnectionStatusUseCase(),
-            clearConnectionCacheUseCase: makeClearConnectionCacheUseCase()
-        )
+        SFTPDevicesViewModel()
     }
     
     @MainActor func makeSFTPDirectoryBrowserViewModel(connection: SFTPConnection) -> SFTPDirectoryBrowserViewModel {

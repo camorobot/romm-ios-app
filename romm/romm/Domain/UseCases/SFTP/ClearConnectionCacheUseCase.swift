@@ -14,13 +14,11 @@ class ClearConnectionCacheUseCase {
         self.connectionManager = connectionManager
     }
     
-    @MainActor
-    func execute() {
-        connectionManager.clearCache()
+    func execute() async {
+        await connectionManager.clearCache()
     }
 
-    @MainActor
-    func execute(for connection: SFTPConnection) {
-        connectionManager.clearCache(for: connection)
+    func execute(for connection: SFTPConnection) async {
+        await connectionManager.clearCache(for: connection)
     }
 }

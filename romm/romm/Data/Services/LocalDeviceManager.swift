@@ -28,8 +28,42 @@ class LocalDeviceManager: ObservableObject {
     // MARK: - Public Methods
 
     /// Updates the storage information for the current device
+    /// - Note: This is synchronous and should only be used when blocking is acceptable
     func updateStorageInfo() {
         currentDevice.updateStorageInfo()
+        saveDevice()
+    }
+
+    /// Updates the storage information asynchronously to avoid blocking main thread
+    /// - Note: Preferred method for better performance
+    func updateStorageInfoAsync() async {
+        // Perform storage check in background
+        let storage = await Task.detached(priority: .utility) {
+            let fileManager = FileManager.default
+            guard let documentURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                return (available: Int64(0), total: Int64(0))
+            }
+
+            do {
+                let values = try documentURL.resourceValues(forKeys: [
+                    .volumeAvailableCapacityForImportantUsageKey,
+                    .volumeTotalCapacityKey
+                ])
+
+                let available = Int64(values.volumeAvailableCapacityForImportantUsage ?? 0)
+                let total = Int64(values.volumeTotalCapacity ?? 0)
+
+                return (available: available, total: total)
+            } catch {
+                print("Error retrieving storage info: \(error)")
+                return (available: Int64(0), total: Int64(0))
+            }
+        }.value
+
+        // Update on main thread
+        currentDevice.availableStorageBytes = storage.available
+        currentDevice.totalStorageBytes = storage.total
+        currentDevice.updatedAt = Date()
         saveDevice()
     }
 

@@ -246,20 +246,32 @@ class SFTPService: SFTPServiceProtocol {
         }
     }
     
+    // OPTIMIZED: Fast connection test with proper background execution
     func testConnection(_ connection: SFTPConnection) async throws -> Bool {
+        // Use Task.detached with proper isolation to avoid blocking main thread
         return try await withCheckedThrowingContinuation { continuation in
-            Task {
+            Task.detached(priority: .userInitiated) { [weak self] in
                 do {
-                    let sftp = createConnection(connection)
+                    guard let self else {
+                        continuation.resume(returning: false)
+                        return
+                    }
                     
+                    // Create connection in background
+                    let sftp = self.createConnection(connection)
+                    
+                    // Use defer to ensure cleanup happens
+                    defer { 
+                        sftp.disconnect() 
+                    }
+                    
+                    // Quick connection test with timeout built into SSH framework
                     try sftp.connect()
-                    defer { sftp.disconnect() }
-                    
-                    try authenticateConnection(sftp, connection: connection)
+                    try self.authenticateConnection(sftp, connection: connection)
                     
                     continuation.resume(returning: true)
                 } catch {
-                    continuation.resume(throwing: mapMFTError(error))
+                    continuation.resume(throwing: self?.mapMFTError(error) ?? .connectionFailed)
                 }
             }
         }

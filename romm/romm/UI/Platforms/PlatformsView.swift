@@ -28,6 +28,15 @@ struct PlatformsView: View {
             }
         }
         .navigationTitle("Platforms")
+        .onAppear {
+            // Load platforms on first appear for better performance
+            // This prevents blocking during ViewModel initialization
+            if platformsViewModel.platforms.isEmpty && !platformsViewModel.isLoading {
+                Task {
+                    await platformsViewModel.loadPlatforms()
+                }
+            }
+        }
         .alert("Error", isPresented: .constant(platformsViewModel.errorMessage != nil)) {
             Button("Retry") {
                 Task {

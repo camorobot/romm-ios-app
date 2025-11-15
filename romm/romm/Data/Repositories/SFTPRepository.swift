@@ -9,11 +9,7 @@ class SFTPRepository: SFTPRepositoryProtocol {
     private let connectionsKey = "sftp_connections"
     private let favoritesKeyPrefix = "sftp_favorites_"
     
-    @Published private var connections: [SFTPConnection] = []
-    
-    var connectionsPublisher: AnyPublisher<[SFTPConnection], Never> {
-        $connections.eraseToAnyPublisher()
-    }
+    private var connections: [SFTPConnection] = []
     
     init(keychainService: SFTPKeychainServiceProtocol = SFTPKeychainService()) {
         self.keychainService = keychainService

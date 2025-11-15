@@ -81,6 +81,10 @@ protocol DependencyFactoryProtocol {
 }
 
 class DefaultDependencyFactory: DependencyFactoryProtocol {
+    func makeSFTPDevicesViewModel() -> SFTPDevicesViewModel {
+        SFTPDevicesViewModel()
+    }
+    
     static let shared = DefaultDependencyFactory()
     
     // MARK: - Repositories (Singletons)
@@ -285,18 +289,6 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     }
     
     // MARK: - SFTP ViewModels
-    
-    @MainActor func makeSFTPDevicesViewModel() -> SFTPDevicesViewModel {
-        SFTPDevicesViewModel(
-            getAllConnectionsUseCase: makeGetAllConnectionsUseCase(),
-            saveConnectionUseCase: makeSaveConnectionUseCase(),
-            deleteConnectionUseCase: makeDeleteConnectionUseCase(),
-            manageDefaultConnectionUseCase: makeManageDefaultConnectionUseCase(),
-            testConnectionUseCase: makeTestConnectionUseCase(),
-            checkConnectionStatusUseCase: makeCheckConnectionStatusUseCase(),
-            clearConnectionCacheUseCase: makeClearConnectionCacheUseCase()
-        )
-    }
     
     @MainActor func makeSFTPDirectoryBrowserViewModel(connection: SFTPConnection) -> SFTPDirectoryBrowserViewModel {
         SFTPDirectoryBrowserViewModel(

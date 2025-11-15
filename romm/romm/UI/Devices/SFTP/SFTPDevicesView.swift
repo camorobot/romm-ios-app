@@ -1,12 +1,7 @@
 import SwiftUI
 
 struct SFTPDevicesView: View {
-    @State private var viewModel: SFTPDevicesViewModel
-    
-    
-    init(dependencyFactory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
-        self._viewModel = State(wrappedValue: .init(getAllConnectionsUseCase: dependencyFactory.makeGetAllConnectionsUseCase(), saveConnectionUseCase: dependencyFactory.makeSaveConnectionUseCase(), deleteConnectionUseCase: dependencyFactory.makeDeleteConnectionUseCase(), manageDefaultConnectionUseCase: dependencyFactory.makeManageDefaultConnectionUseCase(), testConnectionUseCase: dependencyFactory.makeTestConnectionUseCase(), checkConnectionStatusUseCase: dependencyFactory.makeCheckConnectionStatusUseCase(), clearConnectionCacheUseCase: dependencyFactory.makeClearConnectionCacheUseCase()))
-    }
+    @State private var viewModel = SFTPDevicesViewModel()
     
     var body: some View {
         devicesList
@@ -28,7 +23,7 @@ struct SFTPDevicesView: View {
             .padding(.bottom, 16)
         }
         .refreshable {
-            await viewModel.refreshConnectionStatuses()
+            await viewModel.forceRefreshConnections()
         }
         .sheet(isPresented: $viewModel.showingAddDevice) {
             AddEditSFTPDeviceView(
@@ -49,7 +44,12 @@ struct SFTPDevicesView: View {
             Text(viewModel.error ?? "")
         }
         .task {
-            await viewModel.refreshConnectionStatuses()
+            await viewModel.loadConnectionsAsync()
+        }
+        .onDisappear {
+            // Cancel any running connection tests when view disappears
+            // This prevents UI blocking when switching tabs
+            viewModel.cancelAllConnectionTests()
         }
     }
     
@@ -92,9 +92,9 @@ struct SFTPDevicesView: View {
                         DeviceRow(
                             connection: connection,
                             onEdit: { viewModel.editDevice(connection) },
-                            onDelete: { viewModel.deleteConnection(connection) },
+                            onDelete: { Task { await viewModel.deleteConnection(connection) } },
                             onSetDefault: { viewModel.setDefaultConnection(connection) },
-                            onTest: { await viewModel.testConnection(connection) }
+                            onTest: { viewModel.testConnection(connection) }
                         )
                     }
                 }
@@ -108,7 +108,7 @@ struct DeviceRow: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
     let onSetDefault: () -> Void
-    let onTest: () async -> Void
+    let onTest: () -> Void  // Changed: Removed async for non-blocking operation
 
     var body: some View {
         NavigationLink(destination: TransferHistoryView(deviceId: connection.id)) {
@@ -152,7 +152,7 @@ struct DeviceRow: View {
                         }
 
                         Button("Test Connection") {
-                            Task { await onTest() }
+                            onTest()  // Changed: Direct call without Task wrapper
                         }
 
                         Divider()
@@ -171,9 +171,16 @@ struct DeviceRow: View {
     
     private var connectionStatusIndicator: some View {
         HStack(spacing: 4) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
+            // Animated indicator for connecting state
+            if connection.status == .connecting {
+                ProgressView()
+                    .scaleEffect(0.6)
+                    .frame(width: 8, height: 8)
+            } else {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+            }
             
             Text(connection.status.displayName)
                 .font(.caption)

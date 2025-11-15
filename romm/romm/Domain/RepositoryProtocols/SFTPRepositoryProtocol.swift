@@ -13,6 +13,4 @@ protocol SFTPRepositoryProtocol {
     func getFavoriteDirectories(for connectionId: UUID) -> [String]
     func addFavoriteDirectory(_ path: String, for connectionId: UUID) throws
     func removeFavoriteDirectory(_ path: String, for connectionId: UUID) throws
-    
-    var connectionsPublisher: AnyPublisher<[SFTPConnection], Never> { get }
 }

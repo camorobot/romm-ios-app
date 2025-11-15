@@ -21,28 +21,28 @@ class PlatformsViewModel {
     init(factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
         self.getPlatformsUseCase = factory.makeGetPlatformsUseCase()
         self.addPlatformUseCase = factory.makeAddPlatformUseCase()
-        
-        // Load platforms automatically on init
-        loadPlatforms()
+
+        // Don't load automatically - let view trigger via onAppear for better performance
+        // This prevents blocking the main thread during ViewModel initialization
     }
     
-    private func loadPlatforms() {
-        Task {
-            isLoading = true
-            errorMessage = nil
-            
-            do {
-                try Task.checkCancellation()
-                let platforms = try await getPlatformsUseCase.execute()
-                try Task.checkCancellation()
-                
-                self.platforms = platforms
+    func loadPlatforms() async {
+        guard !isLoading else { return }
+
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try Task.checkCancellation()
+            let platforms = try await getPlatformsUseCase.execute()
+            try Task.checkCancellation()
+
+            self.platforms = platforms
+            self.isLoading = false
+        } catch {
+            if !Task.isCancelled {
                 self.isLoading = false
-            } catch {
-                if !Task.isCancelled {
-                    self.isLoading = false
-                    self.errorMessage = error.localizedDescription
-                }
+                self.errorMessage = error.localizedDescription
             }
         }
     }

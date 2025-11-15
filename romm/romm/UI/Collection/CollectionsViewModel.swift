@@ -29,11 +29,12 @@ class CollectionsViewModel {
     var isDeleting: Bool = false
     var canLoadMoreCollections: Bool = true
     var isLoadingMore: Bool = false
-    
+    private var hasLoadedOnce: Bool = false
+
     var viewState: CollectionViewState {
-        if isLoading {
+        if isLoading && !hasLoadedOnce {
             return .loading
-        } else if collections.isEmpty && virtualCollections.isEmpty {
+        } else if collections.isEmpty && virtualCollections.isEmpty && hasLoadedOnce {
             return .empty
         } else if isLoadingMore {
             return .loadingMore
@@ -41,67 +42,92 @@ class CollectionsViewModel {
             return .loaded
         }
     }
-    
+
     private let getCollectionsUseCase: GetCollectionsUseCase
     private let getVirtualCollectionsUseCase: GetVirtualCollectionsUseCase
     private let deleteCollectionUseCase: DeleteCollectionUseCase
-    
+
     // Pagination state
     private var currentCollectionOffset = 0
     private let collectionsPageSize = 20
-    
+
     // Task management to prevent cancellations
+    private var loadTask: Task<Void, Never>?
     
     init(factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
         self.getCollectionsUseCase = factory.makeGetCollectionsUseCase()
         self.getVirtualCollectionsUseCase = factory.makeGetVirtualCollectionsUseCase()
         self.deleteCollectionUseCase = factory.makeDeleteCollectionUseCase()
-        
-        // Load collections automatically on init
-        loadCollections()
+
+        // Don't load automatically - prevents UI blocking during tab switches
+        // View will trigger loading via .task or .onAppear modifier
     }
     
-    private func loadCollections() {
+    func loadCollections() async {
+        // If we already have data, don't reload
+        if hasLoadedOnce && !collections.isEmpty || !virtualCollections.isEmpty {
+            logger.info("Collections already loaded, skipping")
+            return
+        }
+
+        // If already loading, wait for existing task
+        if let existingTask = loadTask {
+            logger.info("Load already in progress, waiting...")
+            await existingTask.value
+            return
+        }
+
+        // Start new load task
+        loadTask = Task {
+            await performLoad()
+        }
+
+        await loadTask?.value
+        loadTask = nil
+    }
+
+    private func performLoad() async {
         // Cancel any existing loading task
         resetPagination()
-        
+
         isLoading = true
         errorMessage = nil
-        
-        Task {
-            do {
-                // Load collections first with pagination, then virtual collections sequentially to avoid conflicts
-                logger.info("Loading initial collections...")
-                let loadedCollections = try await getCollectionsUseCase.execute(
-                    limit: collectionsPageSize,
-                    offset: 0
-                )
-                
-                // Check if cancelled before continuing
-                try Task.checkCancellation()
-                
-                logger.info("Loading virtual collections...")
-                let loadedVirtualCollections = try await getVirtualCollectionsUseCase.execute(type: "all", limit: 10)
-                
-                // Check if cancelled before updating UI
-                try Task.checkCancellation()
-                
-                self.collections = loadedCollections
-                self.virtualCollections = loadedVirtualCollections
-                self.currentCollectionOffset = 0
-                self.canLoadMoreCollections = loadedCollections.count == self.collectionsPageSize
-                self.isLoading = false
-                
-                logger.info("✅ Loaded \(loadedCollections.count) collections and \(loadedVirtualCollections.count) virtual collections")
-                
-            } catch is CancellationError {
-                logger.info("Collection loading cancelled")
-                // Don't update UI on cancellation
-            } catch {
-                self.isLoading = false
-                self.errorMessage = error.localizedDescription
-                logger.error("❌ Error loading collections: \(error)")
-            }
+
+        do {
+            // Load collections first with pagination, then virtual collections sequentially to avoid conflicts
+            logger.info("Loading initial collections...")
+            let loadedCollections = try await getCollectionsUseCase.execute(
+                limit: collectionsPageSize,
+                offset: 0
+            )
+
+            // Check if cancelled before continuing
+            try Task.checkCancellation()
+
+            logger.info("Loading virtual collections...")
+            let loadedVirtualCollections = try await getVirtualCollectionsUseCase.execute(type: "all", limit: 10)
+
+            // Check if cancelled before updating UI
+            try Task.checkCancellation()
+
+            self.collections = loadedCollections
+            self.virtualCollections = loadedVirtualCollections
+            self.currentCollectionOffset = 0
+            self.canLoadMoreCollections = loadedCollections.count == self.collectionsPageSize
+            self.isLoading = false
+            self.hasLoadedOnce = true
+
+            logger.info("✅ Loaded \(loadedCollections.count) collections and \(loadedVirtualCollections.count) virtual collections")
+
+        } catch is CancellationError {
+            logger.info("Collection loading cancelled")
+            self.isLoading = false
+            // Don't update hasLoadedOnce on cancellation
+        } catch {
+            self.isLoading = false
+            self.hasLoadedOnce = true
+            self.errorMessage = error.localizedDescription
+            logger.error("❌ Error loading collections: \(error)")
         }
     }
     

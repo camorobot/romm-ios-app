@@ -25,41 +25,48 @@ func withTimeout<T: Sendable>(_ timeout: TimeInterval, operation: @escaping () a
     }
 }
 
-@MainActor
+// Remove @MainActor - SFTP operations must NOT block main thread!
+// UI updates will be explicitly done via MainActor.run where needed
 class SFTPConnectionManager: ObservableObject {
     static let shared = SFTPConnectionManager()
-    
+
     private var sftpService: SFTPServiceProtocol?
     private var connectionStatusCache = [UUID: (status: ConnectionStatus, lastChecked: Date)]()
-    private let cacheValidityDuration: TimeInterval = 30
+    // OPTIMIZED: Longer cache validity for better performance
+    private let cacheValidityDuration: TimeInterval = 60 // Increased from 30 to 60 seconds
     private let connectionTimeout: TimeInterval = 10
-    
-    @Published var connectionStatuses = [UUID: ConnectionStatus]()
-    
+
+    // Use MainActor for Published properties only
+    @MainActor @Published var connectionStatuses = [UUID: ConnectionStatus]()
+
     private init() {
         // Service will be injected later to avoid circular dependency
     }
-    
+
     func configure(with sftpService: SFTPServiceProtocol) {
         self.sftpService = sftpService
     }
     
     func checkConnectionStatus(for connection: SFTPConnection, forceRefresh: Bool = false) async -> ConnectionStatus {
         let cacheKey: UUID = connection.id
-        
+
+        // Check cache (fast, no MainActor needed for read)
         if !forceRefresh,
            let cached = connectionStatusCache[cacheKey],
            Date().timeIntervalSince(cached.lastChecked) < cacheValidityDuration {
+            // Update UI on main thread
             await MainActor.run {
                 self.connectionStatuses[cacheKey] = cached.status
             }
             return cached.status
         }
-        
+
+        // Update UI: Set connecting status
         await MainActor.run {
             self.connectionStatuses[cacheKey] = .connecting
         }
-        
+
+        // Perform connection test in BACKGROUND (not on main thread!)
         let status: ConnectionStatus
         do {
             let isConnected = try await withTimeout(connectionTimeout) {
@@ -74,18 +81,16 @@ class SFTPConnectionManager: ObservableObject {
         } catch {
             status = .error
         }
-        
-        // Explicitly ensure types are correct
+
+        // Update cache (background thread is fine)
         let statusEntry: (status: ConnectionStatus, lastChecked: Date) = (status: status, lastChecked: Date())
-        
-        DispatchQueue.main.async {
-            self.connectionStatusCache.updateValue(statusEntry, forKey: cacheKey)
-        }
-        
+        connectionStatusCache.updateValue(statusEntry, forKey: cacheKey)
+
+        // Update UI on main thread
         await MainActor.run {
             self.connectionStatuses[cacheKey] = status
         }
-        
+
         return status
     }
     
@@ -147,17 +152,17 @@ class SFTPConnectionManager: ObservableObject {
         try await sftpService.createDirectory(at: path, connection: connection)
     }
     
-    func clearCache() {
+    func clearCache() async {
         connectionStatusCache.removeAll()
-        Task { @MainActor in
+        await MainActor.run {
             self.connectionStatuses.removeAll()
         }
     }
-    
-    func clearCache(for connection: SFTPConnection) {
+
+    func clearCache(for connection: SFTPConnection) async {
         let cacheKey: UUID = connection.id
         connectionStatusCache.removeValue(forKey: cacheKey)
-        Task { @MainActor in
+        await MainActor.run {
             self.connectionStatuses.removeValue(forKey: cacheKey)
         }
     }

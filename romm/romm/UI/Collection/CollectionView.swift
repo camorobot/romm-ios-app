@@ -94,10 +94,8 @@ struct CollectionView: View {
             await collectionsViewModel.refreshCollections()
         }
         .task {
-            // Load collections if not already loaded
-            if collectionsViewModel.collections.isEmpty && collectionsViewModel.virtualCollections.isEmpty && !collectionsViewModel.isLoading {
-                await collectionsViewModel.refreshCollections()
-            }
+            // Load collections on first appear
+            await collectionsViewModel.loadCollections()
         }
     }
     

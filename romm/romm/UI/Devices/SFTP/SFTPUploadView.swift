@@ -63,7 +63,7 @@ struct SFTPUploadView: View {
                 }
             }
             .sheet(isPresented: $showingDeviceManagement) {
-                SFTPDevicesView(dependencyFactory: dependencyFactory)
+                SFTPDevicesView()
             }
         }
     }

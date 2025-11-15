@@ -18,9 +18,13 @@ struct LocalDeviceDetailView: View {
         }
         .navigationTitle(device.name)
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            // Load data on first appear
+            await viewModel.loadDownloadedROMsAsync()
+        }
         .refreshable {
-            viewModel.loadDownloadedROMs()
-            viewModel.refreshStorageInfo()
+            await viewModel.loadDownloadedROMsAsync()
+            await viewModel.refreshStorageInfo()
         }
         .alert("Delete ROM?", isPresented: $viewModel.showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) {
@@ -79,6 +83,13 @@ struct LocalDeviceDetailView: View {
                                 rom: rom,
                                 onDelete: { viewModel.confirmDelete(rom) }
                             )
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    viewModel.confirmDelete(rom)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                 }
@@ -161,6 +172,7 @@ struct LocalDeviceDetailView: View {
 struct DownloadedROMRow: View {
     let rom: DownloadedROM
     let onDelete: () -> Void
+    @State private var showShareSheet = false
 
     var body: some View {
         HStack {
@@ -191,25 +203,25 @@ struct DownloadedROMRow: View {
 
             Spacer()
 
-            Menu {
-                Button("Show in Files") {
-                    // TODO: Implement show in files
-                }
-
-                Button("Share") {
-                    // TODO: Implement share
-                }
-
-                Divider()
-
-                Button("Delete", role: .destructive, action: onDelete)
+            Button {
+                showShareSheet = true
             } label: {
-                Image(systemName: "ellipsis.circle")
+                Image(systemName: "square.and.arrow.up")
                     .font(.title3)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.blue)
             }
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 4)
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(activityItems: getROMFiles())
+        }
+    }
+
+    private func getROMFiles() -> [URL] {
+        let romsBaseURL = LocalROMRepository().romsBaseURL
+        let romDirectoryURL = rom.fullPath(romsBaseURL: romsBaseURL)
+        return rom.files.map { romDirectoryURL.appendingPathComponent($0.fileName) }
     }
 }
 

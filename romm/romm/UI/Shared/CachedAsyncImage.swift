@@ -30,10 +30,11 @@ private struct AsyncImageLoader<Content: View, Placeholder: View>: View {
     let url: URL?
     let content: (Image) -> Content
     let placeholder: () -> Placeholder
-    
+
     @State private var loadedImage: UIImage?
     @State private var isLoading = false
-    
+    @State private var hasDecompressionError = false
+
     var body: some View {
         Group {
             if let loadedImage = loadedImage {
@@ -48,39 +49,65 @@ private struct AsyncImageLoader<Content: View, Placeholder: View>: View {
         }
         .onChange(of: url) { _, newURL in
             loadedImage = nil
+            hasDecompressionError = false
             loadImage()
         }
     }
-    
-    private func loadImage() {
+
+    private func loadImage(forceRefresh: Bool = false) {
         guard let url = url, !isLoading else { return }
-        
+
         isLoading = true
-        
-        let options: KingfisherOptionsInfo = [
+
+        // Optimized Kingfisher options for better performance and stability
+        var options: KingfisherOptionsInfo = [
             .diskCacheExpiration(.days(30)),
-            .backgroundDecode,
+            .backgroundDecode, // Decode images in background thread
             .scaleFactor(UIScreen.main.scale),
             .processor(DownsamplingImageProcessor(size: CGSize(width: 300, height: 300))),
             .retryStrategy(DelayRetryStrategy(maxRetryCount: 2, retryInterval: .seconds(0.5))),
-            .loadDiskFileSynchronously
+            .cacheSerializer(FormatIndicatedCacheSerializer.png) // Use PNG serializer to avoid decompression errors
         ]
-        
+
+        // Force refresh from network if we had a decompression error
+        if forceRefresh || hasDecompressionError {
+            options.append(.forceRefresh)
+        }
+
+        // Use async callback to avoid DispatchQueue.main.async overhead
         KingfisherManager.shared.retrieveImage(with: url, options: options) { result in
-            DispatchQueue.main.async {
+            Task { @MainActor [isLoading, loadedImage] in
+                // Struct doesn't need weak self - no retain cycles
                 self.isLoading = false
+
                 switch result {
                 case .success(let value):
-                    self.loadedImage = value.image                    
+                    self.loadedImage = value.image
+                    self.hasDecompressionError = false
+
                 case .failure(let error):
-                    // Handle decompression errors by clearing cache and potentially retrying
-                    if error.errorDescription?.contains("decompressing") == true || error.errorDescription?.contains("-17102") == true {
-                        Logger.general.warning("🗑️ Image decompression failed, clearing cache for: \(url)")
-                        KingfisherManager.shared.cache.removeImage(forKey: url.absoluteString)
+                    // Handle decompression errors by clearing cache and retrying
+                    if error.errorDescription?.contains("decompressing") == true ||
+                       error.errorDescription?.contains("-17102") == true ||
+                       error.isTaskCancelled == false {
+
+                        if !self.hasDecompressionError {
+                            Logger.general.warning("🔄 Image decompression failed, clearing cache and retrying: \(url)")
+
+                            // Clear corrupt cache
+                            KingfisherManager.shared.cache.removeImage(forKey: url.cacheKey)
+
+                            // Mark that we had an error and retry once
+                            self.hasDecompressionError = true
+                            self.loadImage(forceRefresh: true)
+                        } else {
+                            Logger.general.error("❌ Image decompression failed after retry: \(url)")
+                            self.loadedImage = nil
+                        }
                     } else {
                         Logger.general.error("❌ Failed to load image from \(url): \(error)")
+                        self.loadedImage = nil
                     }
-                    self.loadedImage = nil
                 }
             }
         }
