@@ -15,18 +15,16 @@ class SFTPDirectoryBrowserViewModel {
     private let manageFavoriteDirectoriesUseCase: ManageFavoriteDirectoriesUseCase
     private let createDirectoryUseCase: CreateSFTPDirectoryUseCase
     private var pathHistory: [String] = ["/"]
-    
+
     init(
-        connection: SFTPConnection, 
-        listDirectoryUseCase: ListDirectoryUseCase,
-        manageFavoriteDirectoriesUseCase: ManageFavoriteDirectoriesUseCase,
-        createDirectoryUseCase: CreateSFTPDirectoryUseCase
+        connection: SFTPConnection,
+        factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared
     ) {
         self.connection = connection
-        self.listDirectoryUseCase = listDirectoryUseCase
-        self.manageFavoriteDirectoriesUseCase = manageFavoriteDirectoriesUseCase
-        self.createDirectoryUseCase = createDirectoryUseCase
-        
+        self.listDirectoryUseCase = factory.makeListDirectoryUseCase()
+        self.manageFavoriteDirectoriesUseCase = factory.makeManageFavoriteDirectoriesUseCase()
+        self.createDirectoryUseCase = factory.makeCreateSFTPDirectoryUseCase()
+
         loadFavoriteDirectories()
     }
     

@@ -4,12 +4,9 @@ struct SFTPUploadView: View {
     @State private var viewModel: SFTPUploadViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showingDeviceManagement = false
-    
-    private let dependencyFactory: DependencyFactoryProtocol
-    
-    init(rom: Rom, dependencyFactory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
-        self.dependencyFactory = dependencyFactory
-        self._viewModel = State(initialValue: SFTPUploadViewModel(rom: rom, apiClient: RommAPIClient.shared))
+
+    init(rom: Rom, factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
+        self._viewModel = State(initialValue: factory.makeSFTPUploadViewModel(rom: rom))
     }
     
     var body: some View {
@@ -57,7 +54,7 @@ struct SFTPUploadView: View {
             }
             .sheet(isPresented: $viewModel.showingDirectoryBrowser) {
                 if let connection = viewModel.selectedConnection {
-                    SFTPDirectoryBrowserView(connection: connection, romName: viewModel.rom.name, dependencyFactory: dependencyFactory) { path in
+                    SFTPDirectoryBrowserView(connection: connection, romName: viewModel.rom.name) { path in
                         viewModel.selectTargetPath(path)
                     }
                 }
@@ -668,6 +665,6 @@ struct DeviceSelectionRow: View {
             hasRetroAchievements: true,
             isPlayable: true
         ),
-        dependencyFactory: MockDependencyFactory()
+        factory: MockDependencyFactory()
     )
 }

@@ -10,7 +10,8 @@
 
 class MockDependencyFactory: DependencyFactoryProtocol {
     var transferHistoryRepository: TransferHistoryRepositoryProtocol
-    
+    var localROMRepository: LocalROMRepositoryProtocol
+
     // Mock repositories can be injected for testing
     var authRepository: AuthRepositoryProtocol
     var romsRepository: RomsRepositoryProtocol
@@ -19,7 +20,7 @@ class MockDependencyFactory: DependencyFactoryProtocol {
     var setupRepository: SetupRepositoryProtocol
     var sftpRepository: SFTPRepositoryProtocol
     var fileSystemRepository: FileSystemRepositoryProtocol
-    
+
     // Mock services
     var sftpKeychainService: SFTPKeychainServiceProtocol
     var sftpService: SFTPServiceProtocol
@@ -65,6 +66,7 @@ class MockDependencyFactory: DependencyFactoryProtocol {
         
         self.apiClient = apiClient ?? RommAPIClient.shared
         transferHistoryRepository = TransferHistoryRepository()
+        localROMRepository = LocalROMRepository()
     }
     
     func makeLogoutUseCase() -> LogoutUseCase {
@@ -221,24 +223,21 @@ class MockDependencyFactory: DependencyFactoryProtocol {
     @MainActor func makeSFTPDirectoryBrowserViewModel(connection: SFTPConnection) -> SFTPDirectoryBrowserViewModel {
         SFTPDirectoryBrowserViewModel(
             connection: connection,
-            listDirectoryUseCase: makeListDirectoryUseCase(),
-            manageFavoriteDirectoriesUseCase: makeManageFavoriteDirectoriesUseCase(),
-            createDirectoryUseCase: makeCreateSFTPDirectoryUseCase()
+            factory: self
         )
     }
-    
+
     @MainActor func makeSFTPUploadViewModel(rom: Rom) -> SFTPUploadViewModel {
         SFTPUploadViewModel(
-            rom: rom,            
-            apiClient: apiClient
+            rom: rom,
+            factory: self
         )
     }
-    
+
     @MainActor func makeAddEditSFTPDeviceViewModel(connection: SFTPConnection?) -> AddEditSFTPDeviceViewModel {
         AddEditSFTPDeviceViewModel(
             connection: connection,
-            getCredentialsUseCase: makeGetCredentialsUseCase(),
-            testConnectionUseCase: makeTestConnectionUseCase()
+            factory: self
         )
     }
     

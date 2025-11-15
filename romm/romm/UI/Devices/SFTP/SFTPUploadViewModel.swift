@@ -102,10 +102,9 @@ class SFTPUploadViewModel {
     private let uploadFileUseCase: UploadFileUseCase
     private let listDirectoryUseCase: ListDirectoryUseCase
     private let apiClient: RommAPIClientProtocol
-    
+
     init(
         rom: Rom,
-        apiClient: RommAPIClientProtocol,
         factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared
     ) {
         print("🔍 Debug: SFTPUploadViewModel init with ROM:")
@@ -115,15 +114,15 @@ class SFTPUploadViewModel {
         print("🔍 Debug: ROM fileName: \(rom.fileName ?? "nil")")
         print("🔍 Debug: ROM platformId: \(rom.platformId)")
         print("🔍 Debug: ROM sizeBytes: \(rom.sizeBytes ?? 0)")
-        
+
         self.rom = rom
         self.getAllConnectionsUseCase = factory.makeGetAllConnectionsUseCase()
         self.manageDefaultConnectionUseCase = factory.makeManageDefaultConnectionUseCase()
         self.uploadFileUseCase = factory.makeUploadFileUseCase()
         self.listDirectoryUseCase = factory.makeListDirectoryUseCase()
-        self.apiClient = apiClient
-        
-        
+        self.apiClient = factory.apiClient
+
+
         loadConnections()
         loadAvailableFiles()
     }

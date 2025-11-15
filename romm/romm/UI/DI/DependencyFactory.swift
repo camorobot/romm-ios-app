@@ -17,6 +17,7 @@ protocol DependencyFactoryProtocol {
     var sftpRepository: SFTPRepositoryProtocol { get }
     var fileSystemRepository: FileSystemRepositoryProtocol { get }
     var transferHistoryRepository: TransferHistoryRepositoryProtocol { get }
+    var localROMRepository: LocalROMRepositoryProtocol { get }
     
     // Services
     var sftpKeychainService: SFTPKeychainServiceProtocol { get }
@@ -96,6 +97,7 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     lazy var setupRepository: SetupRepositoryProtocol = SetupRepository()
     lazy var fileSystemRepository: FileSystemRepositoryProtocol = FileSystemRepository()
     lazy var transferHistoryRepository: TransferHistoryRepositoryProtocol = TransferHistoryRepository()
+    lazy var localROMRepository: LocalROMRepositoryProtocol = LocalROMRepository()
     
     // MARK: - Services (Singletons)
     
@@ -293,24 +295,21 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     @MainActor func makeSFTPDirectoryBrowserViewModel(connection: SFTPConnection) -> SFTPDirectoryBrowserViewModel {
         SFTPDirectoryBrowserViewModel(
             connection: connection,
-            listDirectoryUseCase: makeListDirectoryUseCase(),
-            manageFavoriteDirectoriesUseCase: makeManageFavoriteDirectoriesUseCase(),
-            createDirectoryUseCase: makeCreateSFTPDirectoryUseCase()
+            factory: self
         )
     }
     
     @MainActor func makeSFTPUploadViewModel(rom: Rom) -> SFTPUploadViewModel {
         SFTPUploadViewModel(
             rom: rom,
-            apiClient: apiClient
+            factory: self
         )
     }
     
     @MainActor func makeAddEditSFTPDeviceViewModel(connection: SFTPConnection?) -> AddEditSFTPDeviceViewModel {
         AddEditSFTPDeviceViewModel(
             connection: connection,
-            getCredentialsUseCase: makeGetCredentialsUseCase(),
-            testConnectionUseCase: makeTestConnectionUseCase()
+            factory: self
         )
     }
 }

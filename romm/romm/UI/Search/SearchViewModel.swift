@@ -16,8 +16,8 @@ class SearchViewModel {
     
     private let searchRomsUseCase: SearchRomsUseCase
     
-    init(dependencyFactory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
-        self.searchRomsUseCase = dependencyFactory.makeSearchRomsUseCase()
+    init(factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
+        self.searchRomsUseCase = factory.makeSearchRomsUseCase()
     }
     
     func search(query: String) async {

@@ -14,8 +14,8 @@ class LocalDeviceDetailViewModel {
 
     private let repository: LocalROMRepositoryProtocol
 
-    init(repository: LocalROMRepositoryProtocol = LocalROMRepository()) {
-        self.repository = repository
+    init(factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
+        self.repository = factory.localROMRepository
         // Don't load automatically - prevents UI blocking during navigation
         // View will trigger loading via .task modifier
     }

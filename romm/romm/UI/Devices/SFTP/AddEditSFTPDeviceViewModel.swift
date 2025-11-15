@@ -22,11 +22,11 @@ class AddEditSFTPDeviceViewModel {
     private let getCredentialsUseCase: GetCredentialsUseCase
     private let testConnectionUseCase: TestConnectionUseCase
     private var editingConnection: SFTPConnection?
-    
+
     var isEditing: Bool {
         editingConnection != nil
     }
-    
+
     var isValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -36,7 +36,7 @@ class AddEditSFTPDeviceViewModel {
         Int(port)! <= 65535 &&
         isAuthenticationValid
     }
-    
+
     private var isAuthenticationValid: Bool {
         switch authenticationType {
         case .password:
@@ -47,16 +47,15 @@ class AddEditSFTPDeviceViewModel {
             return !password.isEmpty && !privateKey.isEmpty
         }
     }
-    
+
     init(
         connection: SFTPConnection? = nil,
-        getCredentialsUseCase: GetCredentialsUseCase,
-        testConnectionUseCase: TestConnectionUseCase
+        factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared
     ) {
-        self.getCredentialsUseCase = getCredentialsUseCase
-        self.testConnectionUseCase = testConnectionUseCase
+        self.getCredentialsUseCase = factory.makeGetCredentialsUseCase()
+        self.testConnectionUseCase = factory.makeTestConnectionUseCase()
         self.editingConnection = connection
-        
+
         if let connection = connection {
             loadConnection(connection)
         }

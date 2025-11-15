@@ -8,17 +8,11 @@
 import SwiftUI
 
 struct SearchView: View {
-    @State private var searchViewModel: SearchViewModel
+    @State private var searchViewModel = SearchViewModel()
     @EnvironmentObject var appData: AppData
     @State private var searchText = ""
     @State private var searchTask: Task<Void, Never>?
     @FocusState private var isSearchFieldFocused: Bool
-    private let dependencyFactory: DependencyFactoryProtocol
-    
-    init(dependencyFactory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
-        self.dependencyFactory = dependencyFactory
-        self._searchViewModel = State(initialValue: SearchViewModel(dependencyFactory: dependencyFactory))
-    }
     
     var body: some View {
         searchContentView

@@ -16,12 +16,11 @@ class TransferHistoryViewModel {
 
     init(
         deviceId: UUID,
-        getHistoryUseCase: GetTransferHistoryGroupedByPlatformUseCase,
-        clearHistoryUseCase: ClearTransferHistoryUseCase
+        factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared
     ) {
         self.deviceId = deviceId
-        self.getHistoryUseCase = getHistoryUseCase
-        self.clearHistoryUseCase = clearHistoryUseCase
+        self.getHistoryUseCase = factory.makeGetTransferHistoryGroupedByPlatformUseCase()
+        self.clearHistoryUseCase = factory.makeClearTransferHistoryUseCase()
         loadHistory()
     }
 
