@@ -74,7 +74,8 @@ struct PlatformDetailView: View {
                         platform: platform
                     )
                 } else {
-                    LoadingView("Loading ROMs...")
+                    // Show skeleton loading based on viewMode
+                    skeletonLoadingView
                 }
                 
             case .loaded(let roms), .loadingMore(let roms):
@@ -247,6 +248,44 @@ struct PlatformDetailView: View {
             return viewModel.lastLoadedRoms
         default:
             return []
+        }
+    }
+
+    @ViewBuilder
+    private var skeletonLoadingView: some View {
+        switch viewModel.viewMode {
+        case .bigCard:
+            ScrollView {
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12)
+                ], spacing: 16) {
+                    ForEach(0..<8, id: \.self) { _ in
+                        SkeletonBigRomCardView()
+                    }
+                }
+                .padding(16)
+            }
+
+        case .smallCard:
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(0..<12, id: \.self) { _ in
+                        SkeletonSmallRomCardView()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+
+        case .table:
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(0..<15, id: \.self) { _ in
+                        SkeletonTableRomRowView()
+                    }
+                }
+            }
         }
     }
 }

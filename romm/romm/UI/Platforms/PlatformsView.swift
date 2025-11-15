@@ -16,7 +16,15 @@ struct PlatformsView: View {
     var body: some View {
         ZStack {
             if platformsViewModel.isLoading && platformsViewModel.platforms.isEmpty {
-                LoadingView("Loading platforms...")
+                // Show skeleton loading
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        ForEach(0..<8, id: \.self) { _ in
+                            SkeletonPlatformRowView()
+                        }
+                    }
+                    .padding()
+                }
             } else if platformsViewModel.platforms.isEmpty {
                 EmptyPlatformsView()
             } else {

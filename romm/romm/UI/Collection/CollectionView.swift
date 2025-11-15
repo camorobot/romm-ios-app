@@ -64,7 +64,19 @@ struct CollectionView: View {
     
     @ViewBuilder
     private var loadingView: some View {
-        LoadingView("Loading collections...")
+        List {
+            Section("Virtual Collections") {
+                ForEach(0..<3, id: \.self) { _ in
+                    SkeletonCollectionRowView()
+                }
+            }
+
+            Section("Custom Collections") {
+                ForEach(0..<5, id: \.self) { _ in
+                    SkeletonCollectionRowView()
+                }
+            }
+        }
     }
     
     @ViewBuilder
