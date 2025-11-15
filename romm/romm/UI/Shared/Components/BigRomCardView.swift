@@ -32,7 +32,12 @@ struct TopRoundedRectangle: Shape {
 struct BigRomCardView: View {
     let rom: Rom
     let platform: Platform?
-    
+
+    // N64 covers are typically taller/narrower, so we use .fit to prevent overflow
+    private var coverContentMode: ContentMode {
+        rom.platformSlug?.lowercased() == "n64" ? .fit : .fill
+    }
+
     init(rom: Rom, platform: Platform? = nil) {
         self.rom = rom
         self.platform = platform
@@ -45,7 +50,7 @@ struct BigRomCardView: View {
                 CachedKFImage(urlString: rom.urlCover) { image in
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .aspectRatio(contentMode: coverContentMode)
                 } placeholder: {
                     Rectangle()
                         .fill(LinearGradient(
