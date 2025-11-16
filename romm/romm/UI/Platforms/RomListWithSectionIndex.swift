@@ -128,7 +128,9 @@ struct RomListWithSectionIndex: View {
                         }
                         .id(selectedChar) // Force refresh when selectedChar changes
                         }
+                        .background(Color("bg_color"))
                     }
+                    .background(Color("bg_color"))
                     .refreshable {
                         loadMoreTriggeredRoms.removeAll()
                         await onRefresh?()
