@@ -18,6 +18,17 @@ struct LocalDeviceDetailView: View {
         }
         .navigationTitle(device.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
         .task {
             // Load data on first appear
             await viewModel.loadDownloadedROMsAsync()
@@ -75,20 +86,35 @@ struct LocalDeviceDetailView: View {
                 storageInfoCard
             }
 
-            ForEach(viewModel.platformNames, id: \.self) { platformName in
-                if let roms = viewModel.romsByPlatform[platformName] {
-                    Section(platformName) {
-                        ForEach(roms) { rom in
-                            DownloadedROMRow(
-                                rom: rom,
-                                onDelete: { viewModel.confirmDelete(rom) }
-                            )
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
+            Section("Platforms") {
+                ForEach(viewModel.platformNames, id: \.self) { platformName in
+                    if let roms = viewModel.romsByPlatform[platformName] {
+                        NavigationLink {
+                            PlatformROMsListView(
+                                platformName: platformName,
+                                roms: roms,
+                                onDelete: { rom in
                                     viewModel.confirmDelete(rom)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
                                 }
+                            )
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(platformName)
+                                        .font(.headline)
+
+                                    Text("\(roms.count) ROM\(roms.count == 1 ? "" : "s")")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                // Total size for this platform
+                                let totalSize = roms.reduce(0) { $0 + $1.totalSizeBytes }
+                                Text(ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
                             }
                         }
                     }
@@ -166,62 +192,6 @@ struct LocalDeviceDetailView: View {
         .padding()
         .background(Color.gray.opacity(0.1))
         .cornerRadius(12)
-    }
-}
-
-struct DownloadedROMRow: View {
-    let rom: DownloadedROM
-    let onDelete: () -> Void
-    @State private var showShareSheet = false
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(rom.name)
-                    .font(.headline)
-
-                HStack(spacing: 8) {
-                    Text(rom.formattedSize)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Text("•")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Text(rom.formattedDate)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                if rom.files.count > 1 {
-                    Text("\(rom.files.count) files")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
-
-            Button {
-                showShareSheet = true
-            } label: {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.title3)
-                    .foregroundColor(.blue)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.vertical, 4)
-        .sheet(isPresented: $showShareSheet) {
-            ShareSheet(activityItems: getROMFiles())
-        }
-    }
-
-    private func getROMFiles() -> [URL] {
-        let romsBaseURL = LocalROMRepository().romsBaseURL
-        let romDirectoryURL = rom.fullPath(romsBaseURL: romsBaseURL)
-        return rom.files.map { romDirectoryURL.appendingPathComponent($0.fileName) }
     }
 }
 

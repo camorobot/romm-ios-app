@@ -24,16 +24,31 @@ class LocalDeviceDetailViewModel {
 
     /// Loads downloaded ROMs asynchronously to avoid blocking main thread
     func loadDownloadedROMsAsync() async {
-        isLoading = true
+        // Only show loading if we don't have data yet
+        if downloadedROMs.isEmpty {
+            isLoading = true
+        }
         error = nil
 
-        // Perform FileManager operations in background
+        // Perform FileManager operations in background with higher priority for better responsiveness
         let result = await Task.detached(priority: .userInitiated) { [repository = self.repository] () -> Result<(roms: [DownloadedROM], byPlatform: [String: [DownloadedROM]], totalSize: Int64), Error> in
             do {
+                // Optimize: Calculate everything in one pass
                 let downloadedROMs = try repository.getAllDownloadedROMs()
-                let romsByPlatform = try repository.getDownloadedROMsByPlatform()
-                let totalDownloadedSize = try repository.getTotalDownloadedSize()
-                return .success((downloadedROMs, romsByPlatform, totalDownloadedSize))
+
+                // Group by platform and calculate total size in single pass
+                var romsByPlatform: [String: [DownloadedROM]] = [:]
+                var totalSize: Int64 = 0
+
+                for rom in downloadedROMs {
+                    if romsByPlatform[rom.platformName] == nil {
+                        romsByPlatform[rom.platformName] = []
+                    }
+                    romsByPlatform[rom.platformName]?.append(rom)
+                    totalSize += rom.totalSizeBytes
+                }
+
+                return .success((downloadedROMs, romsByPlatform, totalSize))
             } catch {
                 return .failure(error)
             }

@@ -144,8 +144,11 @@ class LocalROMRepository: LocalROMRepositoryProtocol {
     func deleteDownloadedROM(_ rom: DownloadedROM) throws {
         let romDirectoryURL = romsBaseURL.appendingPathComponent(rom.localDirectory)
 
-        // Delete the entire ROM directory
-        try fileManager.removeItem(at: romDirectoryURL)
+        // Delete the entire ROM directory if it exists
+        // If it doesn't exist, consider the deletion successful (already gone)
+        if fileManager.fileExists(atPath: romDirectoryURL.path) {
+            try fileManager.removeItem(at: romDirectoryURL)
+        }
     }
 
     func getTotalDownloadedSize() throws -> Int64 {
