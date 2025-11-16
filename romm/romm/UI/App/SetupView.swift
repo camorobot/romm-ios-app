@@ -41,14 +41,31 @@ struct SetupView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Server URL")
                             .font(.headline)
-                        TextField("http://192.168.1.100", text: $serverURL)
+                        TextField("",
+                                  text: $serverURL,
+                                  prompt: Text("Server Endpoint").foregroundColor(.secondary))
                             .textFieldStyle(.roundedBorder)
-                            .textContentType(.URL)
-                            .autocapitalization(.none)
                             .keyboardType(.URL)
-                        Text("Examples: http://192.168.1.100 or https://romm.example.com")
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+
+                        // Quick input chips
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                QuickInputChip(text: "192.168.", action: { insertText("192.168.") })
+                                QuickInputChip(text: "http://", action: { insertText("http://") })
+                                QuickInputChip(text: "https://", action: { insertText("https://") })
+                                QuickInputChip(text: ":8080", action: { insertText(":8080") })
+                                QuickInputChip(text: ".com", action: { insertText(".com") })
+                                QuickInputChip(text: ".de", action: { insertText(".de") })
+                                QuickInputChip(text: ".org", action: { insertText(".org") })
+                            }
+                        }
+
+                        Text(verbatim: "Examples: http://192.168.1.100 or https://romm.example.com")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                        
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
@@ -128,5 +145,29 @@ struct SetupView: View {
     
     private func hideKeyboard() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    private func insertText(_ text: String) {
+        serverURL += text
+    }
+}
+
+// MARK: - QuickInputChip Component
+struct QuickInputChip: View {
+    let text: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(text)
+                .font(.caption)
+                .fontWeight(.medium)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color(.systemGray5))
+                .foregroundColor(.secondary)
+                .clipShape(Capsule())
+                .cornerRadius(12)
+        }
     }
 }

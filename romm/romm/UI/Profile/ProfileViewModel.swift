@@ -36,12 +36,20 @@ class ProfileViewModel {
     
     func restartSetup() {
         logger.info("Restarting setup...")
-        
+
         do {
             try clearSetupConfigurationUseCase.execute()
             logger.info("Setup restart complete")
+
+            // Notify AppViewModel to transition to setup state
+            NotificationCenter.default.post(name: .restartSetupRequested, object: nil)
         } catch {
             logger.error("Failed to restart setup: \(error)")
         }
     }
+}
+
+// MARK: - Notification Names
+extension NSNotification.Name {
+    static let restartSetupRequested = NSNotification.Name("RestartSetupRequested")
 }

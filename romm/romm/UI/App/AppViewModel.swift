@@ -41,6 +41,17 @@ class AppViewModel {
         self.saveSetupConfigurationUseCase = factory.makeSaveSetupConfigurationUseCase()
         self.getSetupConfigurationUseCase = factory.makeGetSetupConfigurationUseCase()
         self.clearSetupConfigurationUseCase = factory.makeClearSetupConfigurationUseCase()
+
+        // Listen for restart setup requests
+        NotificationCenter.default.addObserver(
+            forName: .restartSetupRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleRestartSetupRequest()
+            }
+        }
     }
     
     // MARK: - Public Methods
@@ -123,5 +134,14 @@ class AppViewModel {
     func clearError() {
         appData.updateError(nil)
     }
-    
+
+    // MARK: - Private Methods
+
+    private func handleRestartSetupRequest() {
+        logger.info("Handling restart setup request from notification")
+        resetAuthenticationState()
+        appData.updateConfiguration(nil)
+        appState = .setup
+    }
+
 }
