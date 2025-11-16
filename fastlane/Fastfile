@@ -30,10 +30,7 @@ platform :ios do
 
   desc "Capture screenshots for the App Store"
   lane :screenshots do
-    capture_screenshots(
-      workspace: "romm/romm.xcodeproj/project.xcworkspace",
-      scheme: "rommUITests"
-    )
+    snapshot
   end
 
   desc "Build and upload beta to TestFlight"
@@ -59,11 +56,9 @@ platform :ios do
         UI.user_error!("❌ Beta release must be done from main branch")
       end
     end
-
-    # Capture screenshots (optional, can be skipped)
-    if UI.confirm("Do you want to capture new screenshots?")
-      screenshots
-    end
+    
+    # Capture screenshots
+    screenshots
 
     # Increment build number
     UI.message("🔢 Incrementing build number...")

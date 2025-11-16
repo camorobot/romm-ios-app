@@ -10,16 +10,37 @@ import XCTest
 final class rommUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
         // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }
 
     override func tearDownWithError() throws {
         // Put teardown code here. This method is called after the invocation of each test method in the class.
+    }
+
+    @MainActor
+    func testTakeScreenshots() throws {
+        let app = XCUIApplication()
+        setupSnapshot(app)
+        app.launch()
+
+        // Wait for app to load
+        sleep(2)
+
+        // Take main screen screenshot
+        snapshot("01-Home")
+
+        // Navigate to Profile/Settings tab
+        let tabBar = app.tabBars.firstMatch
+        if tabBar.waitForExistence(timeout: 5) {
+            // Try to find the profile/settings tab button
+            let profileButton = tabBar.buttons.element(boundBy: 1) // Usually second tab
+            if profileButton.exists {
+                profileButton.tap()
+                sleep(1)
+                snapshot("02-Profile")
+            }
+        }
     }
 
     @MainActor
