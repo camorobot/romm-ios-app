@@ -145,7 +145,7 @@ struct SettingsView: View {
                     .foregroundColor(.blue)
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color(.systemGroupedBackground))
         }
     }
     
