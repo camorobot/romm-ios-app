@@ -1,0 +1,181 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Increment build number"
+  lane :bump_build do
+    increment_build_number(
+      xcodeproj: "romm/romm.xcodeproj"
+    )
+  end
+
+  desc "Generate release notes from recent commits"
+  lane :release_notes do
+    changelog = changelog_from_git_commits(
+      commits_count: 10,
+      pretty: "- %s",
+      date_format: "short",
+      match_lightweight_tag: false,
+      merge_commit_filtering: "exclude_merges"
+    )
+
+    UI.message("📝 Release Notes:")
+    UI.message(changelog)
+
+    changelog
+  end
+
+  desc "Capture screenshots for the App Store"
+  lane :screenshots do
+    capture_screenshots(
+      workspace: "romm/romm.xcodeproj/project.xcworkspace",
+      scheme: "rommUITests"
+    )
+  end
+
+  desc "Build and upload beta to TestFlight"
+  lane :beta do
+    # Ensure we're on main or prompt to merge
+    ensure_git_status_clean
+
+    current_branch = git_branch
+
+    if current_branch != "main"
+      UI.important("⚠️  Currently on branch: #{current_branch}")
+
+      if UI.confirm("Do you want to merge #{current_branch} into main?")
+        # Switch to main
+        sh("git checkout main")
+        sh("git pull origin main")
+
+        # Merge current branch
+        sh("git merge #{current_branch} --no-edit")
+
+        UI.success("✅ Merged #{current_branch} into main")
+      else
+        UI.user_error!("❌ Beta release must be done from main branch")
+      end
+    end
+
+    # Capture screenshots (optional, can be skipped)
+    if UI.confirm("Do you want to capture new screenshots?")
+      screenshots
+    end
+
+    # Increment build number
+    UI.message("🔢 Incrementing build number...")
+    build_number = increment_build_number(
+      xcodeproj: "romm/romm.xcodeproj"
+    )
+
+    # Get marketing version
+    version_number = get_version_number(
+      xcodeproj: "romm/romm.xcodeproj",
+      target: "romm"
+    )
+
+    # Generate changelog
+    changelog = release_notes
+
+    # Commit version bump
+    git_commit(
+      path: ["romm/romm.xcodeproj/project.pbxproj"],
+      message: "Bump build number to #{build_number}"
+    )
+
+    # Create beta tag
+    beta_tag = "v#{version_number}-beta.#{build_number}"
+    add_git_tag(
+      tag: beta_tag,
+      message: "Beta release #{beta_tag}\n\n#{changelog}"
+    )
+
+    UI.success("🏷️  Created tag: #{beta_tag}")
+
+    # Build the app
+    UI.message("🔨 Building app...")
+    gym(
+      workspace: "romm/romm.xcodeproj/project.xcworkspace",
+      scheme: "romm",
+      export_method: "app-store",
+      clean: true,
+      output_directory: "./build"
+    )
+
+    # Upload to TestFlight
+    UI.message("📤 Uploading to TestFlight...")
+    pilot(
+      skip_waiting_for_build_processing: true,
+      changelog: changelog,
+      distribute_external: false,
+      notify_external_testers: false
+    )
+
+    # Push tags to remote
+    if UI.confirm("Push tags and commits to remote?")
+      push_to_git_remote(
+        tags: true
+      )
+      UI.success("✅ Pushed to remote")
+    end
+
+    UI.success("🎉 Beta release #{beta_tag} completed successfully!")
+  end
+
+  desc "Quick beta without merge confirmation (when already on main)"
+  lane :quick_beta do
+    ensure_git_status_clean
+    ensure_git_branch(branch: "main")
+
+    # Increment build number
+    UI.message("🔢 Incrementing build number...")
+    build_number = increment_build_number(
+      xcodeproj: "romm/romm.xcodeproj"
+    )
+
+    # Get marketing version
+    version_number = get_version_number(
+      xcodeproj: "romm/romm.xcodeproj",
+      target: "romm"
+    )
+
+    # Generate changelog
+    changelog = release_notes
+
+    # Commit version bump
+    git_commit(
+      path: ["romm/romm.xcodeproj/project.pbxproj"],
+      message: "Bump build number to #{build_number}"
+    )
+
+    # Create beta tag
+    beta_tag = "v#{version_number}-beta.#{build_number}"
+    add_git_tag(
+      tag: beta_tag,
+      message: "Beta release #{beta_tag}\n\n#{changelog}"
+    )
+
+    UI.success("🏷️  Created tag: #{beta_tag}")
+
+    # Build the app
+    UI.message("🔨 Building app...")
+    gym(
+      workspace: "romm/romm.xcodeproj/project.xcworkspace",
+      scheme: "romm",
+      export_method: "app-store",
+      clean: true,
+      output_directory: "./build"
+    )
+
+    # Upload to TestFlight
+    UI.message("📤 Uploading to TestFlight...")
+    pilot(
+      skip_waiting_for_build_processing: true,
+      changelog: changelog
+    )
+
+    # Push everything
+    push_to_git_remote(tags: true)
+
+    UI.success("🎉 Beta release #{beta_tag} completed successfully!")
+  end
+end

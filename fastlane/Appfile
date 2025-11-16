@@ -1,0 +1,8 @@
+app_identifier("de.ilyashallak.rommanagerplus") # The bundle identifier of your app
+apple_id("ilyashallak@gmail.com") # Your Apple Developer Portal username
+
+itc_team_id("8J69P655GN") # App Store Connect Team ID
+team_id("8J69P655GN") # Developer Portal Team ID
+
+# For more information about the Appfile, see:
+#     https://docs.fastlane.tools/advanced/#appfile
