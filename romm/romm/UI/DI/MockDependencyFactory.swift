@@ -20,6 +20,7 @@ class MockDependencyFactory: DependencyFactoryProtocol {
     var setupRepository: SetupRepositoryProtocol
     var sftpRepository: SFTPRepositoryProtocol
     var fileSystemRepository: FileSystemRepositoryProtocol
+    var statsRepository: StatsRepositoryProtocol
 
     // Mock services
     var sftpKeychainService: SFTPKeychainServiceProtocol
@@ -36,6 +37,7 @@ class MockDependencyFactory: DependencyFactoryProtocol {
         setupRepository: SetupRepositoryProtocol? = nil,
         sftpRepository: SFTPRepositoryProtocol? = nil,
         fileSystemRepository: FileSystemRepositoryProtocol? = nil,
+        statsRepository: StatsRepositoryProtocol? = nil,
         sftpKeychainService: SFTPKeychainServiceProtocol? = nil,
         sftpService: SFTPServiceProtocol? = nil,
         sftpConnectionManager: SFTPConnectionManager? = nil,
@@ -49,6 +51,7 @@ class MockDependencyFactory: DependencyFactoryProtocol {
         self.collectionsRepository = collectionsRepository ?? CollectionsRepository()
         self.setupRepository = setupRepository ?? SetupRepository()
         self.fileSystemRepository = fileSystemRepository ?? FileSystemRepository()
+        self.statsRepository = statsRepository ?? StatsRepository()
         
         let keychainService = sftpKeychainService ?? SFTPKeychainService()
         self.sftpKeychainService = keychainService
@@ -112,7 +115,11 @@ class MockDependencyFactory: DependencyFactoryProtocol {
     func makeAddPlatformUseCase() -> AddPlatformUseCase {
         AddPlatformUseCase(platformsRepository: platformsRepository)
     }
-    
+
+    func makeGetStatsUseCase() -> GetStatsUseCase {
+        GetStatsUseCase(statsRepository: statsRepository)
+    }
+
     func makeGetCollectionsUseCase() -> GetCollectionsUseCase {
         GetCollectionsUseCase(collectionsRepository: collectionsRepository)
     }

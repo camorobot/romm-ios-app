@@ -9,13 +9,18 @@ import Foundation
 
 struct PlatformMapper {
     static func mapFromAPI(_ apiPlatform: PlatformSchema) -> Platform {
-        Platform(
+        // Determine manufacturer from family name or category
+        let manufacturer = apiPlatform.familyName ?? apiPlatform.category
+
+        return Platform(
             id: apiPlatform.id,
             name: apiPlatform.name,
             slug: apiPlatform.slug,
             igdbId: apiPlatform.igdbId,
             logoPath: apiPlatform.urlLogo,
-            romCount: apiPlatform.romCount
+            romCount: apiPlatform.romCount,
+            sizeBytes: apiPlatform.fsSizeBytes,
+            manufacturer: manufacturer
         )
     }
 }

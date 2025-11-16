@@ -14,20 +14,24 @@ struct Platform: Identifiable, Equatable, Hashable {
     let igdbId: Int?
     let logoPath: String?
     let romCount: Int
-    
+    let sizeBytes: Int
+    let manufacturer: String?
+
     var logoUrl: String? {
         guard let logoPath = logoPath else { return nil }
-        
+
         return logoPath
     }
-    
+
     init(
         id: Int,
         name: String,
         slug: String,
         igdbId: Int? = nil,
         logoPath: String? = nil,
-        romCount: Int = 0
+        romCount: Int = 0,
+        sizeBytes: Int = 0,
+        manufacturer: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -35,5 +39,7 @@ struct Platform: Identifiable, Equatable, Hashable {
         self.igdbId = igdbId
         self.logoPath = logoPath
         self.romCount = romCount
+        self.sizeBytes = sizeBytes
+        self.manufacturer = manufacturer
     }
 }

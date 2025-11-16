@@ -1,5 +1,9 @@
 default_platform(:ios)
 
+# Fix locale for UTF-8 encoding
+ENV['LC_ALL'] = 'en_US.UTF-8'
+ENV['LANG'] = 'en_US.UTF-8'
+
 platform :ios do
   desc "Increment build number"
   lane :bump_build do

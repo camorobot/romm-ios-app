@@ -91,6 +91,16 @@ struct SettingsView: View {
                 }
             }
             
+            // Statistics Section
+            Section("Statistics") {
+                NavigationLink(destination: StatsView()) {
+                    HStack {
+                        Image(systemName: "chart.bar.fill")
+                        Text("Server Statistics")
+                    }
+                }
+            }
+
             // App Settings Section
             Section("App Settings") {
                 NavigationLink(destination: LoggingConfigurationView()) {
@@ -99,7 +109,7 @@ struct SettingsView: View {
                         Text("Logging Configuration")
                     }
                 }
-                
+
                 NavigationLink(destination: ImageCacheSettingsView()) {
                     HStack {
                         Image(systemName: "photo.stack")
@@ -123,7 +133,7 @@ struct SettingsView: View {
                 resetConfiguration()
             }
         } message: {
-            Text("This will reset all configuration settings and return you to the setup screen.")
+            Text("This will delete all configuration settings including your server connection and credentials. You will be returned to the setup screen.")
         }
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 4) {

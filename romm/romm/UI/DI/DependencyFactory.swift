@@ -18,6 +18,7 @@ protocol DependencyFactoryProtocol {
     var fileSystemRepository: FileSystemRepositoryProtocol { get }
     var transferHistoryRepository: TransferHistoryRepositoryProtocol { get }
     var localROMRepository: LocalROMRepositoryProtocol { get }
+    var statsRepository: StatsRepositoryProtocol { get }
     
     // Services
     var sftpKeychainService: SFTPKeychainServiceProtocol { get }
@@ -38,6 +39,7 @@ protocol DependencyFactoryProtocol {
     func makeLoadManualUseCase() -> LoadManualUseCase
     func makeGetPlatformsUseCase() -> GetPlatformsUseCase
     func makeAddPlatformUseCase() -> AddPlatformUseCase
+    func makeGetStatsUseCase() -> GetStatsUseCase
     func makeGetCollectionsUseCase() -> GetCollectionsUseCase
     func makeGetVirtualCollectionsUseCase() -> GetVirtualCollectionsUseCase
     func makeCreateCollectionUseCase() -> CreateCollectionUseCase
@@ -98,6 +100,7 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     lazy var fileSystemRepository: FileSystemRepositoryProtocol = FileSystemRepository()
     lazy var transferHistoryRepository: TransferHistoryRepositoryProtocol = TransferHistoryRepository()
     lazy var localROMRepository: LocalROMRepositoryProtocol = LocalROMRepository()
+    lazy var statsRepository: StatsRepositoryProtocol = StatsRepository()
     
     // MARK: - Services (Singletons)
     
@@ -166,7 +169,13 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     func makeAddPlatformUseCase() -> AddPlatformUseCase {
         AddPlatformUseCase(platformsRepository: platformsRepository)
     }
-    
+
+    // MARK: - Stats Use Cases
+
+    func makeGetStatsUseCase() -> GetStatsUseCase {
+        GetStatsUseCase(statsRepository: statsRepository)
+    }
+
     // MARK: - Collection Use Cases
     
     func makeGetCollectionsUseCase() -> GetCollectionsUseCase {
