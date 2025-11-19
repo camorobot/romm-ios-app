@@ -2,7 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 
-A native iOS app for managing and browsing your ROM collection through the RomM API.
+A native iOS companion app for [RomM](https://github.com/rommapp/romm). Connect to your RomM server to browse, manage, and organize your retro game ROM collection directly from your iPhone or iPad.
 
 ## Download
 
@@ -11,10 +11,6 @@ A native iOS app for managing and browsing your ROM collection through the RomM 
 Join the beta program and help improve the app:
 
 [Join TestFlight Beta](https://testflight.apple.com/join/F4C5mhrC)
-
-## Overview
-
-A native iOS companion app for [RomM](https://github.com/rommapp/romm). Connect to your RomM server to browse, manage, and organize your retro game ROM collection directly from your iPhone or iPad.
 
 ## Features
 
