@@ -1,0 +1,14 @@
+# Ignore all icon files
+*.ico
+*.svg
+*.png
+
+# Keep converted_png and systematic directories but ignore their contents
+converted_png/
+systematic/
+
+# Keep important files
+!HOW_TO.md
+!.gitignore
+!rebuild_all_icons.sh
+!ATTRIBUTIONS
