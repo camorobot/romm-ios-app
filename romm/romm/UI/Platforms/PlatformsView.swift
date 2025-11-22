@@ -80,6 +80,7 @@ struct PlatformListView: View {
             }
             .padding()
         }
+        .background(Color(.systemGroupedBackground))
         .refreshable {
             await viewModel.refreshPlatforms()
         }
@@ -120,7 +121,7 @@ struct PlatformRowView: View {
                 .font(.caption)
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(.secondarySystemGroupedBackground))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(.separator), lineWidth: 0.5)

@@ -23,7 +23,7 @@ struct MainTabView: View {
                 }
             }
             
-            Tab("Collection", systemImage: "books.vertical") {
+            Tab("Collections", systemImage: "books.vertical") {
                 NavigationStack {
                     CollectionView()
                 }

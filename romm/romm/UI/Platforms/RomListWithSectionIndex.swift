@@ -76,7 +76,7 @@ struct RomListWithSectionIndex: View {
                                                 BigRomCardView(rom: rom, platform: platform)
                                                     .background(
                                                         RoundedRectangle(cornerRadius: 16)
-                                                            .fill(Color(.systemBackground))
+                                                            .fill(Color(.secondarySystemGroupedBackground))
                                                             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
                                                     )
                                                     .overlay(
@@ -122,15 +122,16 @@ struct RomListWithSectionIndex: View {
                                 sectionHeader(section.letter)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(Color(.systemBackground))
+                                    .padding(.top, 16)
+                                    .padding(.bottom, 8)
+                                    .background(Color(.systemGroupedBackground))
                             }
                         }
                         .id(selectedChar) // Force refresh when selectedChar changes
                         }
-                        .background(Color("bg_color"))
+                        .background(Color(.systemGroupedBackground))
                     }
-                    .background(Color("bg_color"))
+                    .background(Color(.systemGroupedBackground))
                     .refreshable {
                         loadMoreTriggeredRoms.removeAll()
                         await onRefresh?()

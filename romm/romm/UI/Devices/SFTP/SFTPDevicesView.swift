@@ -31,11 +31,6 @@ struct SFTPDevicesView: View {
                 onSave: viewModel.saveConnection
             )
         }
-        .sheet(isPresented: $viewModel.showingLocalDeviceDetail) {
-            NavigationStack {
-                LocalDeviceDetailView()
-            }
-        }
         .alert("Error", isPresented: .constant(viewModel.error != nil)) {
             Button("OK") {
                 viewModel.error = nil
@@ -81,8 +76,7 @@ struct SFTPDevicesView: View {
         List {
             Section("This Device") {
                 LocalDeviceRow(
-                    device: LocalDeviceManager.shared.currentDevice,
-                    onTap: { viewModel.showLocalDeviceDetail() }
+                    device: LocalDeviceManager.shared.currentDevice
                 )
             }
 
@@ -204,16 +198,14 @@ struct DeviceRow: View {
 
 struct LocalDeviceRow: View {
     let device: LocalDevice
-    let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
+        NavigationLink(destination: LocalDeviceDetailView()) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text(device.name)
                             .font(.headline)
-                            .foregroundColor(.primary)
 
                         if device.isDefault {
                             Text("DEFAULT")
@@ -241,14 +233,9 @@ struct LocalDeviceRow: View {
                 }
 
                 Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
             .padding(.vertical, 4)
         }
-        .buttonStyle(.plain)
     }
 }
 

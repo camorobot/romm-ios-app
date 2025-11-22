@@ -8,7 +8,6 @@ class SFTPDevicesViewModel {
     var error: String?
     var showingAddDevice = false
     var editingConnection: SFTPConnection?
-    var showingLocalDeviceDetail = false
 
     // Track running connection tests to allow cancellation
     private var runningTasks: [UUID: Task<Void, Never>] = [:]
@@ -188,10 +187,6 @@ class SFTPDevicesViewModel {
         }
     }
 
-    func showLocalDeviceDetail() {
-        showingLocalDeviceDetail = true
-    }
-    
     // Cancel all running connection tests (call when view disappears)
     func cancelAllConnectionTests() {
         for task in runningTasks.values {

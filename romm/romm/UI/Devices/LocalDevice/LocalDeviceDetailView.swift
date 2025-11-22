@@ -2,7 +2,6 @@ import SwiftUI
 
 struct LocalDeviceDetailView: View {
     @State private var viewModel = LocalDeviceDetailViewModel()
-    @Environment(\.dismiss) private var dismiss
 
     private var device: LocalDevice {
         LocalDeviceManager.shared.currentDevice
@@ -18,17 +17,6 @@ struct LocalDeviceDetailView: View {
         }
         .navigationTitle(device.name)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
         .task {
             // Load data on first appear
             await viewModel.loadDownloadedROMsAsync()

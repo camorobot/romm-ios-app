@@ -146,12 +146,12 @@ struct BigRomCardView: View {
             }
             .frame(height: 100)
             .padding(16)
-            .background(Color(.systemBackground))
+            .background(Color(.secondarySystemGroupedBackground))
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.systemBackground))
+                .fill(Color(.secondarySystemGroupedBackground))
                 .shadow(
                     color: Color.primary.opacity(0.15),
                     radius: 8, x: 0, y: 4

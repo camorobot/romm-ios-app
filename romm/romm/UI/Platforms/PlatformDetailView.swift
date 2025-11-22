@@ -419,7 +419,7 @@ struct SmallRomCardView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color(.secondarySystemGroupedBackground))
                 .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 2)
         )
         .overlay(
