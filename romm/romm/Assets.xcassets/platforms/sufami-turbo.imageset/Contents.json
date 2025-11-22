@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "sufami-turbo.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

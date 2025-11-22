@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "tg16.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

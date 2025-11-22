@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "atari2600.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

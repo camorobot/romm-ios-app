@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "philips-cd-i.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

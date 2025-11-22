@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "atari8bit.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

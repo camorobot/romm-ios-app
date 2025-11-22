@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "fairchild-channel-f.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

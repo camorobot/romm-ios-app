@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "sharp-x68000.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
