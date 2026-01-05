@@ -15,9 +15,9 @@ public struct RomUserSchema: Codable, JSONEncodable, Hashable {
     public var createdAt: Date
     public var updatedAt: Date
     public var lastPlayed: Date?
-    public var noteRawMarkdown: String
-    public var noteIsPublic: Bool
-    public var isMainSibling: Bool
+    public var noteRawMarkdown: String?
+    public var noteIsPublic: Bool?
+    public var isMainSibling: Bool?
     public var backlogged: Bool
     public var nowPlaying: Bool
     public var hidden: Bool
@@ -27,7 +27,7 @@ public struct RomUserSchema: Codable, JSONEncodable, Hashable {
     public var status: RomUserStatus?
     public var userUsername: String
 
-    public init(id: Int, userId: Int, romId: Int, createdAt: Date, updatedAt: Date, lastPlayed: Date?, noteRawMarkdown: String, noteIsPublic: Bool, isMainSibling: Bool, backlogged: Bool, nowPlaying: Bool, hidden: Bool, rating: Int, difficulty: Int, completion: Int, status: RomUserStatus?, userUsername: String) {
+    public init(id: Int, userId: Int, romId: Int, createdAt: Date, updatedAt: Date, lastPlayed: Date?, noteRawMarkdown: String?, noteIsPublic: Bool?, isMainSibling: Bool?, backlogged: Bool, nowPlaying: Bool, hidden: Bool, rating: Int, difficulty: Int, completion: Int, status: RomUserStatus?, userUsername: String) {
         self.id = id
         self.userId = userId
         self.romId = romId
@@ -81,8 +81,8 @@ public struct RomUserSchema: Codable, JSONEncodable, Hashable {
         } else {
             lastPlayed = nil
         }
-        noteRawMarkdown = try container.decode(String.self, forKey: .noteRawMarkdown)
-        noteIsPublic = try container.decode(Bool.self, forKey: .noteIsPublic)
+        noteRawMarkdown = try container.decodeIfPresent(String.self, forKey: .noteRawMarkdown)
+        noteIsPublic = try container.decodeIfPresent(Bool.self, forKey: .noteIsPublic)
         isMainSibling = try container.decode(Bool.self, forKey: .isMainSibling)
         backlogged = try container.decode(Bool.self, forKey: .backlogged)
         nowPlaying = try container.decode(Bool.self, forKey: .nowPlaying)
@@ -104,9 +104,9 @@ public struct RomUserSchema: Codable, JSONEncodable, Hashable {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(lastPlayed, forKey: .lastPlayed)
-        try container.encode(noteRawMarkdown, forKey: .noteRawMarkdown)
-        try container.encode(noteIsPublic, forKey: .noteIsPublic)
-        try container.encode(isMainSibling, forKey: .isMainSibling)
+        try container.encodeIfPresent(noteRawMarkdown, forKey: .noteRawMarkdown)
+        try container.encodeIfPresent(noteIsPublic, forKey: .noteIsPublic)
+        try container.encodeIfPresent(isMainSibling, forKey: .isMainSibling)
         try container.encode(backlogged, forKey: .backlogged)
         try container.encode(nowPlaying, forKey: .nowPlaying)
         try container.encode(hidden, forKey: .hidden)
