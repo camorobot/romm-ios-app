@@ -72,10 +72,14 @@ protocol DependencyFactoryProtocol {
     func makeGetTransferHistoryGroupedByPlatformUseCase() -> GetTransferHistoryGroupedByPlatformUseCase
     func makeClearTransferHistoryUseCase() -> ClearTransferHistoryUseCase
     
-    // UI Use Cases  
+    // UI Use Cases
     func makeGetViewModeUseCase() -> GetViewModeUseCaseProtocol
     func makeSaveViewModeUseCase() -> SaveViewModeUseCaseProtocol
-    
+
+    // Emulator Use Cases
+    func makeCheckEmulatorSupportUseCase() -> CheckEmulatorSupportUseCaseProtocol
+    func makeLaunchEmulatorUseCase() -> LaunchEmulatorUseCaseProtocol
+
     // SFTP ViewModels
     @MainActor func makeSFTPDevicesViewModel() -> SFTPDevicesViewModel
     @MainActor func makeSFTPDirectoryBrowserViewModel(connection: SFTPConnection) -> SFTPDirectoryBrowserViewModel
@@ -290,15 +294,28 @@ class DefaultDependencyFactory: DependencyFactoryProtocol {
     }
 
     // MARK: - UI Use Cases
-    
+
     func makeGetViewModeUseCase() -> GetViewModeUseCaseProtocol {
         GetViewModeUseCase()
     }
-    
+
     func makeSaveViewModeUseCase() -> SaveViewModeUseCaseProtocol {
         SaveViewModeUseCase()
     }
-    
+
+    // MARK: - Emulator Use Cases
+
+    func makeCheckEmulatorSupportUseCase() -> CheckEmulatorSupportUseCaseProtocol {
+        CheckEmulatorSupportUseCase()
+    }
+
+    func makeLaunchEmulatorUseCase() -> LaunchEmulatorUseCaseProtocol {
+        LaunchEmulatorUseCase(
+            tokenProvider: TokenProvider(),
+            checkEmulatorSupport: makeCheckEmulatorSupportUseCase()
+        )
+    }
+
     // MARK: - SFTP ViewModels
     
     @MainActor func makeSFTPDirectoryBrowserViewModel(connection: SFTPConnection) -> SFTPDirectoryBrowserViewModel {

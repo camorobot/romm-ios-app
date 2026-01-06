@@ -245,7 +245,7 @@ class MockDependencyFactory: DependencyFactoryProtocol {
         AddEditSFTPDeviceViewModel(
             connection: connection,
             factory: self
-        )
+        )   
     }
     
     func makeSaveTransferHistoryUseCase() -> SaveTransferHistoryUseCase {
@@ -262,5 +262,16 @@ class MockDependencyFactory: DependencyFactoryProtocol {
     
     func makeClearTransferHistoryUseCase() -> ClearTransferHistoryUseCase {
         .init(repository: transferHistoryRepository)
+    }
+    
+    func makeCheckEmulatorSupportUseCase() -> CheckEmulatorSupportUseCaseProtocol {
+        CheckEmulatorSupportUseCase()
+    }
+
+    func makeLaunchEmulatorUseCase() -> LaunchEmulatorUseCaseProtocol {
+        LaunchEmulatorUseCase(
+            tokenProvider: TokenProvider(),
+            checkEmulatorSupport: makeCheckEmulatorSupportUseCase()
+        )
     }
 }

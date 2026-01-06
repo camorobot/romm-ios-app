@@ -10,7 +10,7 @@ import SafariServices
 
 struct RomDetailView: View {
     let rom: Rom
-    private var viewModel = RomDetailViewModel()
+    @State private var viewModel = RomDetailViewModel()
     
     @Environment(\.dismiss) private var dismiss
     @State private var scrollOffset: CGFloat = 0
@@ -187,6 +187,9 @@ struct RomDetailView: View {
                             )
                         }
                     }
+                    .fullScreenCover(isPresented: $viewModel.showingEmulator) {
+                        EmulatorView(rom: currentSelectedRom)
+                    }
                     .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
                         Button("OK") {
                             viewModel.clearError()
@@ -352,6 +355,27 @@ struct RomDetailView: View {
                 .accessibility(hint: Text(viewModel.romCollectionsCount > 0 ? "Manage ROM collections" : "Add this ROM to a collection"))
             }
             
+            // Play Button
+            Button(action: {
+                Task {
+                    await viewModel.launchEmulator(rom: currentSelectedRom)
+                }
+            }) {
+                Label("Play", systemImage: "play.circle.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.green)
+                    )
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+            }
+            .opacity(viewModel.canPlayEmulator ? 1.0 : 0.6)
+            .disabled(!viewModel.canPlayEmulator)
+            .accessibility(hint: Text("Play this ROM in the emulator"))
+
             // Send to Device Button
             Button(action: {
                 showingSFTPUpload = true

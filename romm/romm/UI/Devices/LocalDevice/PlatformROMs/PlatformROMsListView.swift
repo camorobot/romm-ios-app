@@ -6,49 +6,73 @@ struct PlatformROMsListView: View {
     let roms: [DownloadedROM]
     let onDelete: (DownloadedROM) -> Void
 
+    @State private var selectedRomForEmulator: DownloadedROM?
+    @State private var showingEmulator = false
+
     var body: some View {
         List {
             ForEach(roms) { rom in
-                // Make entire row tappable with share button
-                ZStack(alignment: .trailing) {
-                    // Background tappable area
-                    ROMInfoView(rom: rom)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            // Future: Navigate to ROM details
-                            print("Tapped ROM: \(rom.name)")
-                        }
-
-                    // Share button overlay (prevents tap-through)
-                    HStack {
-                        Spacer()
-                        ShareButton(rom: rom)
-                            .padding(.trailing, 8)
+                Button {
+                    // Tap to play (if supported)
+                    if isPlatformSupported(rom.platformSlug) {
+                        selectedRomForEmulator = rom
+                        showingEmulator = true
                     }
+                } label: {
+                    ROMInfoView(rom: rom, isPlayable: isPlatformSupported(rom.platformSlug))
                 }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                .buttonStyle(.plain)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
                         onDelete(rom)
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
                 }
+                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                    ShareSwipeButton(rom: rom)
+                }
             }
         }
         .navigationTitle(platformName)
         .navigationBarTitleDisplayMode(.inline)
+        .overlay {
+            if showingEmulator, let downloadedRom = selectedRomForEmulator {
+                // Convert DownloadedROM to Rom for EmulatorView
+                EmulatorView(rom: downloadedRom.toRom())
+                    .ignoresSafeArea()
+            }
+        }
+    }
+
+    /// Check if platform is supported by EmulatorJS
+    private func isPlatformSupported(_ platformSlug: String) -> Bool {
+        let supportedPlatforms: Set<String> = [
+            // Nintendo
+            "nes", "snes", "n64", "gba", "gbc", "gb", "nds",
+            // Sega
+            "genesis", "megadrive", "mastersystem", "gamegear", "saturn", "dreamcast",
+            // Sony
+            "psx", "ps1", "playstation", "psp",
+            // Other
+            "arcade"
+        ]
+
+        return supportedPlatforms.contains { platformSlug.lowercased().contains($0) }
     }
 }
 
 /// ROM information display (non-interactive)
 private struct ROMInfoView: View {
     let rom: DownloadedROM
+    let isPlayable: Bool
 
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(rom.name)
                     .font(.headline)
+                    .foregroundColor(.primary)
 
                 HStack(spacing: 8) {
                     Text(rom.formattedSize)
@@ -72,13 +96,21 @@ private struct ROMInfoView: View {
             }
 
             Spacer()
+
+            // Play indicator for playable ROMs
+            if isPlayable {
+                Image(systemName: "play.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.green)
+            }
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
     }
 }
 
-/// Share button component
-private struct ShareButton: View {
+/// Share swipe action button
+private struct ShareSwipeButton: View {
     let rom: DownloadedROM
     @State private var shareSheetItem: ShareSheetItem?
     @State private var showFileNotFoundAlert = false
@@ -95,12 +127,9 @@ private struct ShareButton: View {
                 print("🎯 Created ShareSheetItem with \(files.count) URLs")
             }
         } label: {
-            Image(systemName: "square.and.arrow.up")
-                .font(.title3)
-                .foregroundColor(.blue)
-                .padding(8)
+            Label("Share", systemImage: "square.and.arrow.up")
         }
-        .buttonStyle(.plain)
+        .tint(.blue)
         .sheet(item: $shareSheetItem, onDismiss: cleanupTemporaryFiles) { item in
             let _ = print("📋 Sheet presenting with \(item.urls.count) items:")
             let _ = item.urls.forEach { print("   - \($0.lastPathComponent)") }

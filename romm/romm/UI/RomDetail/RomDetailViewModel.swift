@@ -26,7 +26,11 @@ class RomDetailViewModel {
     var states: [StateSchema] = []
     var isLoadingSaves: Bool = false
     var isLoadingStates: Bool = false
-    
+
+    // Emulator
+    var showingEmulator: Bool = false
+    var canPlayEmulator: Bool = false
+
     private let logger = Logger.viewModel
     
     private let getRomDetailsUseCase: GetRomDetailsUseCase
@@ -34,13 +38,17 @@ class RomDetailViewModel {
     private let checkRomFavoriteStatusUseCase: CheckRomFavoriteStatusUseCase
     private let loadManualUseCase: LoadManualUseCase
     private let getCollectionsUseCase: GetCollectionsUseCase
-    
+    private let checkEmulatorSupportUseCase: CheckEmulatorSupportUseCaseProtocol
+    private let launchEmulatorUseCase: LaunchEmulatorUseCaseProtocol
+
     init(factory: DependencyFactoryProtocol = DefaultDependencyFactory.shared) {
         self.getRomDetailsUseCase = factory.makeGetRomDetailsUseCase()
         self.toggleRomFavoriteUseCase = factory.makeToggleRomFavoriteUseCase()
         self.checkRomFavoriteStatusUseCase = factory.makeCheckRomFavoriteStatusUseCase()
         self.loadManualUseCase = factory.makeLoadManualUseCase()
         self.getCollectionsUseCase = factory.makeGetCollectionsUseCase()
+        self.checkEmulatorSupportUseCase = factory.makeCheckEmulatorSupportUseCase()
+        self.launchEmulatorUseCase = factory.makeLaunchEmulatorUseCase()
     }
     
     func loadRomDetails(romId: Int) async {
@@ -69,10 +77,13 @@ class RomDetailViewModel {
             
             // Count how many collections contain this ROM
             romCollectionsCount = collections.filter { $0.romIds.contains(romId) }.count
-            
+
+            // Check emulator support
+            checkEmulatorSupport()
+
             isLoading = false
-            
-            logger.info("Loaded ROM details for \(details.name) - Favorite: \(favoriteStatus), Collections: \(romCollectionsCount)")
+
+            logger.info("Loaded ROM details for \(details.name) - Favorite: \(favoriteStatus), Collections: \(romCollectionsCount), Emulator: \(canPlayEmulator)")
         } catch {
             isLoading = false
             errorMessage = error.localizedDescription
@@ -253,7 +264,7 @@ class RomDetailViewModel {
     
     private func loadSiblingDetails() async {
         guard let originalDetails = originalRomDetails else { return }
-        
+
         // Load details for each sibling to get their specific names
         for sibling in originalDetails.siblings {
             if siblingDetails[sibling.id] == nil {
@@ -266,6 +277,34 @@ class RomDetailViewModel {
                     siblingDetails[sibling.id] = sibling.displayNameWithExtension
                 }
             }
+        }
+    }
+
+    // MARK: - Emulator
+
+    func checkEmulatorSupport() {
+        guard let platformSlug = romDetails?.platformDisplayName else {
+            canPlayEmulator = false
+            return
+        }
+
+        // Use dedicated UseCase for platform support check
+        canPlayEmulator = checkEmulatorSupportUseCase.execute(platformSlug: platformSlug)
+        logger.debug("Emulator support for '\(platformSlug)': \(canPlayEmulator)")
+    }
+
+    func launchEmulator(rom: Rom) async {
+        // Use dedicated UseCase for pre-flight checks
+        let result = await launchEmulatorUseCase.execute(rom: rom)
+
+        switch result {
+        case .success:
+            logger.info("Launching emulator for ROM: \(rom.name)")
+            showingEmulator = true
+
+        case .failure(let error):
+            logger.error("Failed to launch emulator: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
         }
     }
 }

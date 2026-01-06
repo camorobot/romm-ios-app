@@ -89,20 +89,6 @@ enum APIClientError: LocalizedError {
     }
 }
 
-// URLSession delegate that accepts self-signed certificates for self-hosted servers
-private class SelfSignedCertificateDelegate: NSObject, URLSessionDelegate {
-    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-
-        // Accept self-signed certificates for ServerTrust authentication
-        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-           let serverTrust = challenge.protectionSpace.serverTrust {
-            let credential = URLCredential(trust: serverTrust)
-            completionHandler(.useCredential, credential)
-        } else {
-            completionHandler(.performDefaultHandling, nil)
-        }
-    }
-}
 
 class RommAPIClient: RommAPIClientProtocol {
     static let shared = RommAPIClient()
@@ -110,7 +96,7 @@ class RommAPIClient: RommAPIClientProtocol {
     private let tokenProvider: TokenProviderProtocol
     private let urlSession: URLSession
     private let logger = Logger.network
-    private let sessionDelegate = SelfSignedCertificateDelegate()
+    private let sessionDelegate = PrivateNetworkURLSessionDelegate()
 
     // Cache for configuration to avoid repeated setup
     private var cachedBaseURL: String?
@@ -276,6 +262,8 @@ class RommAPIClient: RommAPIClientProtocol {
                 
             case 401:
                 logger.warning("Authentication failed - invalid credentials")
+                // Post notification to trigger automatic logout on session expiration
+                NotificationCenter.default.post(name: .sessionExpired, object: nil)
                 throw APIClientError.authenticationRequired
                 
             case 400...499:

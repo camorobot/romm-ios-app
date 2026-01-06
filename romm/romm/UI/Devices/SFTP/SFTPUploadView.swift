@@ -60,7 +60,16 @@ struct SFTPUploadView: View {
                 }
             }
             .sheet(isPresented: $showingDeviceManagement) {
-                SFTPDevicesView()
+                NavigationView {
+                    SFTPDevicesView()
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    showingDeviceManagement = false
+                                }
+                            }
+                        }
+                }
             }
         }
     }

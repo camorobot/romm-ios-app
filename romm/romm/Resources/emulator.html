@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EmulatorJS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        #game {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 18px;
+            text-align: center;
+            z-index: 1000;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>Waiting for configuration...</div>
+    </div>
+    <div id="game"></div>
+
+    <script>
+        // Config wird von Swift injiziert
+        window.emulatorConfig = null;
+
+        console.log('📱 Emulator HTML loaded, waiting for config from Swift');
+
+        // Benachrichtige Swift dass die Seite bereit ist
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pageReady) {
+            window.webkit.messageHandlers.pageReady.postMessage('ready');
+            console.log('📱 Sent pageReady message to Swift');
+        }
+
+        // Funktion wird von Swift aufgerufen
+        function startEmulator(config) {
+            console.log('🎮 startEmulator called with config:', config);
+            window.emulatorConfig = config;
+
+            document.getElementById('loading').querySelector('div:last-child').textContent = 'Loading EmulatorJS...';
+
+            // Lade EmulatorJS Loader vom Server
+            const script = document.createElement('script');
+            script.src = config.serverURL + '/assets/emulatorjs/data/loader.js';
+            script.onload = function() {
+                console.log('✅ EmulatorJS loader loaded');
+                initEmulator();
+            };
+            script.onerror = function() {
+                console.error('❌ Failed to load EmulatorJS from server');
+                showError('Failed to load EmulatorJS from server');
+            };
+            document.head.appendChild(script);
+        }
+
+        function initEmulator() {
+            const config = window.emulatorConfig;
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('🎮 Initializing EmulatorJS with config:', config);
+
+            // EmulatorJS Konfiguration
+            EJS_player = '#game';
+            EJS_core = config.core;
+            EJS_gameUrl = config.romFileURL;
+            EJS_pathtodata = config.serverURL + '/assets/emulatorjs/data/';
+            EJS_language = 'en-US';
+            EJS_biosUrl = '';
+
+            console.log('━━━ EmulatorJS Configuration ━━━');
+            console.log('Player:', EJS_player);
+            console.log('Core:', EJS_core);
+            console.log('Data Path:', EJS_pathtodata);
+
+            // Check ROM URL type
+            if (EJS_gameUrl.startsWith('data:')) {
+                const urlLength = EJS_gameUrl.length;
+                const preview = EJS_gameUrl.substring(0, 100);
+                console.log('📦 ROM Type: Base64 Data URL');
+                console.log('📏 Total length:', urlLength, 'characters');
+                console.log('🔍 Preview:', preview + '...');
+            } else if (EJS_gameUrl.startsWith('http')) {
+                console.log('🌐 ROM Type: HTTP/HTTPS URL');
+                console.log('🔗 URL:', EJS_gameUrl);
+            } else {
+                console.log('⚠️ ROM Type: Unknown');
+                console.log('🔗 URL:', EJS_gameUrl.substring(0, 100));
+            }
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+            // Callbacks
+            EJS_onGameStart = function() {
+                console.log('✅ Game started!');
+                document.getElementById('loading').style.display = 'none';
+                notifySwift('emulatorReady', 'ready');
+            };
+
+            EJS_onLoadState = function() {
+                console.log('📦 Load state called');
+            };
+
+            // Test ROM URL accessibility (only for HTTP URLs)
+            if (config.romFileURL.startsWith('http')) {
+                console.log('🔍 Testing ROM URL accessibility...');
+                fetch(config.romFileURL, { method: 'HEAD' })
+                    .then(response => {
+                        console.log('✅ ROM URL accessible:', response.status, response.statusText);
+                    })
+                    .catch(error => {
+                        console.error('❌ ROM URL test failed:', error.message);
+                    });
+            } else if (config.romFileURL.startsWith('data:')) {
+                console.log('ℹ️ Skipping URL test for Base64 Data URL (test not needed)');
+            } else {
+                console.warn('⚠️ Unknown URL type, skipping accessibility test');
+            }
+
+            // Fallback: Wenn nach 10 Sekunden nichts passiert
+            setTimeout(() => {
+                const gameDiv = document.getElementById('game');
+                if (gameDiv.children.length === 0) {
+                    console.error('❌ EmulatorJS did not initialize after 10s');
+                    showError('EmulatorJS failed to initialize<br>Check console for details');
+                } else {
+                    console.log('✅ Game div has', gameDiv.children.length, 'children');
+                }
+            }, 10000);
+        }
+
+        function showError(message) {
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+            loading.innerHTML = '<div style="color: red; font-size: 16px;">' + message + '</div>';
+            notifySwift('emulatorError', message);
+        }
+
+        function notifySwift(handler, message) {
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers[handler]) {
+                window.webkit.messageHandlers[handler].postMessage(message);
+            }
+        }
+
+        // Global Error Handler
+        window.addEventListener('error', function(e) {
+            console.error('❌ JavaScript Error:', e.message, e.filename, e.lineno);
+            notifySwift('emulatorError', e.message || 'Unknown error');
+        });
+
+        // Console forwarding
+        const originalLog = console.log;
+        console.log = function() {
+            originalLog.apply(console, arguments);
+            const message = Array.from(arguments).join(' ');
+            notifySwift('consoleLog', message);
+        };
+
+        const originalError = console.error;
+        console.error = function() {
+            originalError.apply(console, arguments);
+            const message = Array.from(arguments).join(' ');
+            notifySwift('consoleError', message);
+        };
+    </script>
+</body>
+</html>

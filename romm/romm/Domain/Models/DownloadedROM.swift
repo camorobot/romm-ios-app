@@ -29,6 +29,21 @@ struct DownloadedROM: Identifiable, Codable, Equatable {
     static func == (lhs: DownloadedROM, rhs: DownloadedROM) -> Bool {
         return lhs.id == rhs.id
     }
+
+    /// Convert DownloadedROM to Rom for use with EmulatorView
+    func toRom() -> Rom {
+        return Rom(
+            id: id,
+            name: name,
+            platformId: 0, // Not available in DownloadedROM
+            urlCover: nil,
+            isFavourite: false,
+            hasRetroAchievements: false,
+            isPlayable: true,
+            fileName: files.first?.fileName,
+            platformSlug: platformSlug
+        )
+    }
 }
 
 /// Represents a single file within a downloaded ROM

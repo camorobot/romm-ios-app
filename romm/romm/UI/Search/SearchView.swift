@@ -16,8 +16,8 @@ struct SearchView: View {
     
     var body: some View {
         searchContentView
-            .navigationTitle("Suche")
-            .searchable(text: $searchText, prompt: "ROM-Namen eingeben...")
+            .navigationTitle("Search")
+            .searchable(text: $searchText, prompt: "Enter ROM-Name")
             .focused($isSearchFieldFocused)
             .onSubmit(of: .search) {
                 performSearch()
@@ -25,7 +25,7 @@ struct SearchView: View {
             .toolbar {
                 cancelToolbarItem
             }
-            .alert("Fehler", isPresented: .constant(searchViewModel.errorMessage != nil)) {
+            .alert("Error", isPresented: .constant(searchViewModel.errorMessage != nil)) {
                 Button("OK") {
                     searchViewModel.clearError()
                 }
@@ -58,7 +58,7 @@ struct SearchView: View {
     @ViewBuilder
     private var loadingView: some View {
         Spacer()
-        LoadingView("Suche läuft...", fillScreen: false)
+        LoadingView("Searching...", fillScreen: false)
         Spacer()
     }
     
@@ -71,12 +71,12 @@ struct SearchView: View {
                 .foregroundColor(.secondary)
             
             VStack(spacing: 8) {
-                Text("ROM-Suche")
+                Text("ROM-Search")
                     .font(.title2)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
                 
-                Text("Verwende das Suchfeld oben, um ROMs zu finden")
+                Text("Use the search to find your favorite ROMs")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -94,17 +94,17 @@ struct SearchView: View {
                 .foregroundColor(.orange)
             
             VStack(spacing: 8) {
-                Text("Keine Ergebnisse")
+                Text("No Results")
                     .font(.title2)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
                 
-                Text("Keine ROMs für \"\(searchText)\" gefunden")
+                Text("No ROMs found for \"\(searchText)\"")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                 
-                Text("Versuche es mit anderen Suchbegriffen")
+                Text("Try it again with a different search term")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -134,7 +134,7 @@ struct SearchView: View {
     private var resultCountHeader: some View {
         if !searchViewModel.searchResults.isEmpty {
             HStack {
-                Text("\(searchViewModel.searchResults.count) Ergebnis(se) gefunden")
+                Text("\(searchViewModel.searchResults.count) Result(s) found")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Spacer()

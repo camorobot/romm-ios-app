@@ -52,4 +52,5 @@ class ProfileViewModel {
 // MARK: - Notification Names
 extension NSNotification.Name {
     static let restartSetupRequested = NSNotification.Name("RestartSetupRequested")
+    static let sessionExpired = NSNotification.Name("SessionExpired")
 }

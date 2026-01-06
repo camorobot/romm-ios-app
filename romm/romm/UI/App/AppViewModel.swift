@@ -52,6 +52,17 @@ class AppViewModel {
                 self?.handleRestartSetupRequest()
             }
         }
+
+        // Listen for session expiration (401 errors during usage)
+        NotificationCenter.default.addObserver(
+            forName: .sessionExpired,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleSessionExpiration()
+            }
+        }
     }
     
     // MARK: - Public Methods
@@ -102,7 +113,7 @@ class AppViewModel {
             logger.error("Setup configuration failed: \(error)")
             appData.updateLoading(false)
             appData.updateError(error.localizedDescription)
-            appState = .authenticationFailed
+            appState = .setup
         }
     }
     
@@ -142,6 +153,29 @@ class AppViewModel {
         resetAuthenticationState()
         appData.updateConfiguration(nil)
         appState = .setup
+    }
+
+    private func handleSessionExpiration() {
+        logger.warning("Session expired - 401 error detected during usage")
+
+        // Only handle session expiration if user was authenticated (not during setup)
+        guard appState == .authenticated else {
+            logger.debug("Ignoring session expiration - not in authenticated state")
+            return
+        }
+
+        // Clear configuration and redirect to setup
+        do {
+            try clearSetupConfigurationUseCase.execute()
+            resetAuthenticationState()
+            appData.updateConfiguration(nil)
+            appData.updateError("Your session has expired. Please login again.")
+            appState = .setup
+            logger.info("User logged out due to session expiration")
+        } catch {
+            logger.error("Failed to clear configuration on session expiration: \(error)")
+            appData.updateError("Session expired - please restart the app")
+        }
     }
 
 }
