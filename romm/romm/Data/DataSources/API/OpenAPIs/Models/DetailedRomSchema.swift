@@ -56,7 +56,7 @@ public struct DetailedRomSchema: Codable, JSONEncodable, Hashable {
     public var crcHash: String?
     public var md5Hash: String?
     public var sha1Hash: String?
-    public var multi: Bool
+    public var multi: Bool?
     public var files: [RomFileSchema]
     public var fullPath: String
     public var createdAt: Date
@@ -69,10 +69,10 @@ public struct DetailedRomSchema: Codable, JSONEncodable, Hashable {
     public var userSaves: [SaveSchema]
     public var userStates: [StateSchema]
     public var userScreenshots: [ScreenshotSchema]
-    public var userNotes: [UserNotesSchema]
+    public var userNotes: [UserNotesSchema]?
     public var userCollections: [UserCollectionSchema]
 
-    public init(id: Int, igdbId: Int?, sgdbId: Int?, mobyId: Int?, ssId: Int?, raId: Int?, launchboxId: Int?, hasheousId: Int?, tgdbId: Int?, platformId: Int, platformSlug: String, platformFsSlug: String, platformName: String, platformCustomName: String?, platformDisplayName: String, fsName: String, fsNameNoTags: String, fsNameNoExt: String, fsExtension: String, fsPath: String, fsSizeBytes: Int, name: String?, slug: String?, summary: String?, alternativeNames: [String], youtubeVideoId: String?, metadatum: RomMetadataSchema, igdbMetadata: RomIGDBMetadata?, mobyMetadata: RomMobyMetadata?, ssMetadata: RomSSMetadata?, launchboxMetadata: RomLaunchboxMetadata?, hasheousMetadata: RomHasheousMetadata?, pathCoverSmall: String?, pathCoverLarge: String?, urlCover: String?, hasManual: Bool, pathManual: String?, urlManual: String?, isUnidentified: Bool, isIdentified: Bool, revision: String?, regions: [String], languages: [String], tags: [String], crcHash: String?, md5Hash: String?, sha1Hash: String?, multi: Bool, files: [RomFileSchema], fullPath: String, createdAt: Date, updatedAt: Date, missingFromFs: Bool, siblings: [SiblingRomSchema], romUser: RomUserSchema, mergedRaMetadata: RomRAMetadata?, mergedScreenshots: [String], userSaves: [SaveSchema], userStates: [StateSchema], userScreenshots: [ScreenshotSchema], userNotes: [UserNotesSchema], userCollections: [UserCollectionSchema]) {
+    public init(id: Int, igdbId: Int?, sgdbId: Int?, mobyId: Int?, ssId: Int?, raId: Int?, launchboxId: Int?, hasheousId: Int?, tgdbId: Int?, platformId: Int, platformSlug: String, platformFsSlug: String, platformName: String, platformCustomName: String?, platformDisplayName: String, fsName: String, fsNameNoTags: String, fsNameNoExt: String, fsExtension: String, fsPath: String, fsSizeBytes: Int, name: String?, slug: String?, summary: String?, alternativeNames: [String], youtubeVideoId: String?, metadatum: RomMetadataSchema, igdbMetadata: RomIGDBMetadata?, mobyMetadata: RomMobyMetadata?, ssMetadata: RomSSMetadata?, launchboxMetadata: RomLaunchboxMetadata?, hasheousMetadata: RomHasheousMetadata?, pathCoverSmall: String?, pathCoverLarge: String?, urlCover: String?, hasManual: Bool, pathManual: String?, urlManual: String?, isUnidentified: Bool, isIdentified: Bool, revision: String?, regions: [String], languages: [String], tags: [String], crcHash: String?, md5Hash: String?, sha1Hash: String?, multi: Bool?, files: [RomFileSchema], fullPath: String, createdAt: Date, updatedAt: Date, missingFromFs: Bool, siblings: [SiblingRomSchema], romUser: RomUserSchema, mergedRaMetadata: RomRAMetadata?, mergedScreenshots: [String], userSaves: [SaveSchema], userStates: [StateSchema], userScreenshots: [ScreenshotSchema], userNotes: [UserNotesSchema]?, userCollections: [UserCollectionSchema]) {
         self.id = id
         self.igdbId = igdbId
         self.sgdbId = sgdbId
@@ -251,7 +251,7 @@ public struct DetailedRomSchema: Codable, JSONEncodable, Hashable {
         crcHash = try container.decodeIfPresent(String.self, forKey: .crcHash)
         md5Hash = try container.decodeIfPresent(String.self, forKey: .md5Hash)
         sha1Hash = try container.decodeIfPresent(String.self, forKey: .sha1Hash)
-        multi = try container.decode(Bool.self, forKey: .multi)
+        multi = try container.decodeIfPresent(Bool.self, forKey: .multi)
         files = try container.decode([RomFileSchema].self, forKey: .files)
         fullPath = try container.decode(String.self, forKey: .fullPath)
         createdAt = try container.decodeFlexibleDate(forKey: .createdAt)
@@ -264,7 +264,7 @@ public struct DetailedRomSchema: Codable, JSONEncodable, Hashable {
         userSaves = try container.decode([SaveSchema].self, forKey: .userSaves)
         userStates = try container.decode([StateSchema].self, forKey: .userStates)
         userScreenshots = try container.decode([ScreenshotSchema].self, forKey: .userScreenshots)
-        userNotes = try container.decode([UserNotesSchema].self, forKey: .userNotes)
+        userNotes = try container.decodeIfPresent([UserNotesSchema].self, forKey: .userNotes)
         userCollections = try container.decode([UserCollectionSchema].self, forKey: .userCollections)
     }
 
@@ -318,7 +318,7 @@ public struct DetailedRomSchema: Codable, JSONEncodable, Hashable {
         try container.encode(crcHash, forKey: .crcHash)
         try container.encode(md5Hash, forKey: .md5Hash)
         try container.encode(sha1Hash, forKey: .sha1Hash)
-        try container.encode(multi, forKey: .multi)
+        try container.encodeIfPresent(multi, forKey: .multi)
         try container.encode(files, forKey: .files)
         try container.encode(fullPath, forKey: .fullPath)
         try container.encode(createdAt, forKey: .createdAt)
@@ -331,7 +331,7 @@ public struct DetailedRomSchema: Codable, JSONEncodable, Hashable {
         try container.encode(userSaves, forKey: .userSaves)
         try container.encode(userStates, forKey: .userStates)
         try container.encode(userScreenshots, forKey: .userScreenshots)
-        try container.encode(userNotes, forKey: .userNotes)
+        try container.encodeIfPresent(userNotes, forKey: .userNotes)
         try container.encode(userCollections, forKey: .userCollections)
     }
 }
