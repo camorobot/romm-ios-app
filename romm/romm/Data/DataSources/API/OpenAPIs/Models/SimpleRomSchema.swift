@@ -56,7 +56,7 @@ public struct SimpleRomSchema: Codable, JSONEncodable, Hashable {
     public var crcHash: String?
     public var md5Hash: String?
     public var sha1Hash: String?
-    public var multi: Bool
+    public var multi: Bool?
     public var files: [RomFileSchema]
     public var fullPath: String
     public var createdAt: Date
@@ -65,7 +65,7 @@ public struct SimpleRomSchema: Codable, JSONEncodable, Hashable {
     public var siblings: [SiblingRomSchema]
     public var romUser: RomUserSchema
 
-    public init(id: Int, igdbId: Int?, sgdbId: Int?, mobyId: Int?, ssId: Int?, raId: Int?, launchboxId: Int?, hasheousId: Int?, tgdbId: Int?, platformId: Int, platformSlug: String, platformFsSlug: String, platformName: String, platformCustomName: String?, platformDisplayName: String, fsName: String, fsNameNoTags: String, fsNameNoExt: String, fsExtension: String, fsPath: String, fsSizeBytes: Int, name: String?, slug: String?, summary: String?, alternativeNames: [String], youtubeVideoId: String?, metadatum: RomMetadataSchema, igdbMetadata: RomIGDBMetadata?, mobyMetadata: RomMobyMetadata?, ssMetadata: RomSSMetadata?, launchboxMetadata: RomLaunchboxMetadata?, hasheousMetadata: RomHasheousMetadata?, pathCoverSmall: String?, pathCoverLarge: String?, urlCover: String?, hasManual: Bool, pathManual: String?, urlManual: String?, isUnidentified: Bool, isIdentified: Bool, revision: String?, regions: [String], languages: [String], tags: [String], crcHash: String?, md5Hash: String?, sha1Hash: String?, multi: Bool, files: [RomFileSchema], fullPath: String, createdAt: Date, updatedAt: Date, missingFromFs: Bool, siblings: [SiblingRomSchema], romUser: RomUserSchema) {
+    public init(id: Int, igdbId: Int?, sgdbId: Int?, mobyId: Int?, ssId: Int?, raId: Int?, launchboxId: Int?, hasheousId: Int?, tgdbId: Int?, platformId: Int, platformSlug: String, platformFsSlug: String, platformName: String, platformCustomName: String?, platformDisplayName: String, fsName: String, fsNameNoTags: String, fsNameNoExt: String, fsExtension: String, fsPath: String, fsSizeBytes: Int, name: String?, slug: String?, summary: String?, alternativeNames: [String], youtubeVideoId: String?, metadatum: RomMetadataSchema, igdbMetadata: RomIGDBMetadata?, mobyMetadata: RomMobyMetadata?, ssMetadata: RomSSMetadata?, launchboxMetadata: RomLaunchboxMetadata?, hasheousMetadata: RomHasheousMetadata?, pathCoverSmall: String?, pathCoverLarge: String?, urlCover: String?, hasManual: Bool, pathManual: String?, urlManual: String?, isUnidentified: Bool, isIdentified: Bool, revision: String?, regions: [String], languages: [String], tags: [String], crcHash: String?, md5Hash: String?, sha1Hash: String?, multi: Bool?, files: [RomFileSchema], fullPath: String, createdAt: Date, updatedAt: Date, missingFromFs: Bool, siblings: [SiblingRomSchema], romUser: RomUserSchema) {
         self.id = id
         self.igdbId = igdbId
         self.sgdbId = sgdbId
@@ -230,7 +230,7 @@ public struct SimpleRomSchema: Codable, JSONEncodable, Hashable {
         crcHash = try container.decodeIfPresent(String.self, forKey: .crcHash)
         md5Hash = try container.decodeIfPresent(String.self, forKey: .md5Hash)
         sha1Hash = try container.decodeIfPresent(String.self, forKey: .sha1Hash)
-        multi = try container.decode(Bool.self, forKey: .multi)
+        multi = try container.decodeIfPresent(Bool.self, forKey: .multi)
         files = try container.decode([RomFileSchema].self, forKey: .files)
         fullPath = try container.decode(String.self, forKey: .fullPath)
         createdAt = try container.decodeFlexibleDate(forKey: .createdAt)
@@ -290,7 +290,7 @@ public struct SimpleRomSchema: Codable, JSONEncodable, Hashable {
         try container.encode(crcHash, forKey: .crcHash)
         try container.encode(md5Hash, forKey: .md5Hash)
         try container.encode(sha1Hash, forKey: .sha1Hash)
-        try container.encode(multi, forKey: .multi)
+        try container.encodeIfPresent(multi, forKey: .multi)
         try container.encode(files, forKey: .files)
         try container.encode(fullPath, forKey: .fullPath)
         try container.encode(createdAt, forKey: .createdAt)
